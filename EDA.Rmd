@@ -1,0 +1,102 @@
+---
+title: "Jeffrey"
+author: "Jeffrey Cheng"
+date: "2022-11-26"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+
+library(knitr)
+library(mice)
+library(caret)
+library(ggfortify)
+library(dplyr)
+library(tibble)
+library(ggplot2)
+library(ggpubr)
+library(GGally)
+library(tidyverse)
+library(readr)
+library("rstudioapi")
+
+# set default knitr chunks
+knitr::opts_chunk$set(
+  echo = FALSE,  # don't print the code chunk
+  warning = FALSE,  # don't print warnings
+  message = FALSE,  # don't print messages
+  fig.width = 6,  # set default width of figures
+  fig.height = 4,  # set default height of figures
+  fig.align = "center",  # always align figure in center
+  fig.pos = "H",  # always plot figure at the exact location of the code chunk
+  fig.keep = 'all', # keep all printed figures
+  cache = FALSE)  # don't cache results
+
+```
+
+
+```{r load-data, echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE, results = 'hide', fig.keep = 'all'}
+data = read.csv("CSpine/CSV datasets/data.csv", header = TRUE)
+data = subset(data, select=-c(1))
+data = mutate(data, CSFractures = as.integer(CSFractures=="Y"))
+data = mutate(data, TotalGCS = as.integer(TotalGCS))
+data = subset(data, select=-c(TotalGCS))
+
+# split data into validation and test/train sets
+data_validation = filter(data, SITE %in% c(7,15,16))
+data_eda = filter(data, !SITE %in% c(7,15,16))
+
+
+```
+
+```{r EDA-Num-NA}
+# get number of NA (missing values) for each variable
+na_count = colSums(is.na(data_eda))
+variables = colnames(data_eda)
+
+# plot number of NA values for each variable
+fig1 = barplot(na_count)
+
+# plot same as above but sorted
+na_count_sort = sort(na_count, decreasing = T)
+fig2 = barplot(na_count_sort[1:10], main = "Number of Missing Entries", 
+               ylab = 'Counts', las = 2)
+
+
+
+```
+```{r EDA-NA-Freq}
+data_eda_complete = data_eda[complete.cases(data_eda),]
+data_eda_incomplete = data_eda[-complete.cases(data_eda),]
+
+complete_mean = mean(data_eda_complete$CSFractures)
+complete_sd = sd(data_eda_complete$CSFractures)/sqrt(length(data_eda_complete))
+
+incomplete_mean = mean(data_eda_incomplete$CSFractures)
+incomplete_sd = sd(data_eda_incomplete$CSFractures)/sqrt(length(data_eda_incomplete))
+data_fracture_rate <- data.frame(
+  completeness=c("complete", "incomplete"),
+  mean = c(complete_mean, incomplete_mean),
+  sd=c(complete_sd, incomplete_sd)
+)
+ggplot(data_fracture_rate) +
+    geom_bar( aes(x=completeness, y=mean), stat="identity", fill="skyblue", alpha=0.7) +
+    geom_errorbar( aes(x=completeness, ymin=mean-sd, ymax=mean+sd), width=0.4, colour="orange", alpha=0.9, size=1.3)
+```
+
+```{r more-EDA}
+data_eda_complete = data_eda[complete.cases(data_eda),]
+
+
+data_cor_var = subset(data_eda_complete, select=-c(SITE, CaseID, ControlType, StudySubjectID, CSFractures))
+data_cor_res = subset(data_eda_complete, select=c(CSFractures))
+
+data_cor <- cor(data_cor_var, data_cor_res)
+data_cor = abs(data_cor)
+data_cor = data_cor[order(data_cor[,1], decreasing = T),]
+fig3 = barplot(data_cor[1:10], main = "Absolute Correlation with CSFracture", 
+               ylab = '|Corr|', las = 2)
+```
+
+
+
