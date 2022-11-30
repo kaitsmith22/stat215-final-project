@@ -36,15 +36,26 @@ knitr::opts_chunk$set(
 
 
 ```{r load-data, echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE, results = 'hide', fig.keep = 'all'}
-data = read.csv("CSpine/CSV datasets/data.csv", header = TRUE)
-data = subset(data, select=-c(1))
-data = mutate(data, CSFractures = as.integer(CSFractures=="Y"))
-data = mutate(data, TotalGCS = as.integer(TotalGCS))
-data = subset(data, select=-c(TotalGCS))
+data_analysisvariables = read.csv("CSpine/CSV datasets/analysisvariables.csv", header = TRUE)
+data_demographics = read.csv("CSpine/CSV datasets/demographics.csv", header = TRUE)
+data_injuryclassification = read.csv("CSpine/CSV datasets/injuryclassification.csv", header = TRUE)
+data_injuryclassification = mutate(data_injuryclassification, CSFractures = as.integer(CSFractures=="Y"))
+
+# keep important columns
+data_demographics = data_demographics[c('caseid','AgeInYears','Gender','Race','Ethnicity')]
+data_demographics = rename(data_demographics, CaseID = caseid)
+data_injuryclassification = data_injuryclassification[c('CaseID','CSFractures')]
+
+data_case = merge(data_analysisvariables, data_injuryclassification, by="CaseID")
+data_demo = merge(data_case, data_demographics, by="CaseID")
 
 # split data into validation and test/train sets
-data_validation = filter(data, SITE %in% c(7,15,16))
-data_eda = filter(data, !SITE %in% c(7,15,16))
+data_validation = filter(data_case, SITE %in% c(7,15,16))
+data_eda = filter(data_case, !SITE %in% c(7,15,16))
+
+data_validation_demo = filter(data_demo, SITE %in% c(7,15,16))
+data_eda_demo = filter(data_demo, !SITE %in% c(7,15,16))
+
 
 
 ```
@@ -80,8 +91,9 @@ data_fracture_rate <- data.frame(
   sd=c(complete_sd, incomplete_sd)
 )
 ggplot(data_fracture_rate) +
-    geom_bar( aes(x=completeness, y=mean), stat="identity", fill="skyblue", alpha=0.7) +
-    geom_errorbar( aes(x=completeness, ymin=mean-sd, ymax=mean+sd), width=0.4, colour="orange", alpha=0.9, size=1.3)
+    geom_bar( aes(x=completeness, y=mean), stat="identity", fill="skyblue", alpha=0.7, width = 0.5) +
+    geom_errorbar( aes(x=completeness, ymin=mean-sd, ymax=mean+sd), width=0.4, colour="orange", alpha=0.9, size=1.3) + 
+    ggtitle('Fracture Rate, Varying Entry Completeness') + ylab("Fracture Rate") + xlab("Entry Completeness")
 ```
 
 ```{r more-EDA}
