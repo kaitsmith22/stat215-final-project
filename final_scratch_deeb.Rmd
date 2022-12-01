@@ -6,25 +6,143 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
+library(dplyr)
+library(reshape2)
+library(ggplot2)
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Spinal Injury Data
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r}
+analysis <- read.csv("./CSpine/CSV datasets/analysisvariables.csv")
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+# remove holdout sites
+analysis_all <-  analysis
+summary(as.factor(analysis$SITE))
+analysis <- analysis[analysis$SITE != 15 & analysis$SITE != 16 & analysis$SITE != 7,]
+summary(as.factor(analysis$SITE))
 
-```{r cars}
-summary(cars)
+
+hist(analysis$SITE)
+summary(as.factor(analysis$ControlType))
+
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+```{r}
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+
+#cross.tabulation <- table(Q65, Q66)
+#p.table <- prop.table(cross.tabulation, 1)
+#ptdf<- as.data.frame(p.table)
+#ptdf_f <- ptdf |> filter(Q65!="no response", Q66!="no response", Q65!="other", Q66!="other",  Q66!="no word")
+
+#ggplot(ptdf_f, aes(x=Q65, y=Freq, 
+#                  color=Q66, group=Q66)) +
+#  geom_line(size=1)# +
+  #scale_y_continuous(label=percent)
+
+#ggplot(ptdf_f, aes(x=Q65, y=Freq, fill=Q66)) + geom_col()
+
+#dv1 <- dummyVars(~ Q65, data = qdf_f)  
+#dummyCats1 <- predict(dv1, qdf_f)
+
+library(reshape2)
+
+grp1 <- analysis[,c(13,14,15,16)]
+grp1[is.na(grp1)] <- 0
+grp2 <- analysis[,c(18,19,20,21,22,23)]
+grp2[is.na(grp2)] <- 0
+# correlation matrix for the two sets of 1-hot encoded variables
+cormat <- cor(grp1, grp2)
+melted_cormat <- melt(cormat)
+
+# Heatmap of the correlation matrix
+melted_cormat |> filter(!is.na(value)) |>
+  ggplot(aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  geom_text(aes(Var1, Var2, label = round(value,2)),
+          color = "white", size = 4) +
+  labs(x="", y="")
+
+
+
+grp1 <- analysis[,c(5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23)]
+grp1[is.na(grp1)] <- 0
+grp2 <- analysis[,c(5,6)]
+grp2$EMS <- analysis$ControlType == "ems"
+grp2$RAN <- analysis$ControlType == "ran"
+grp2$MOI <- analysis$ControlType == "moi"
+grp2$PositiveCase <- analysis$ControlType == "case"
+# correlation matrix for the two sets of 1-hot encoded variables
+cormat <- cor(grp1, grp2)
+melted_cormat <- melt(cormat)
+
+# Heatmap of the correlation matrix
+melted_cormat |> filter(!is.na(value)) |>
+  ggplot(aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  geom_text(aes(Var1, Var2, label = round(value,2)),
+          color = "white", size = 2) +
+  labs(x="", y="") +
+  theme(axis.text.x=element_text(angle = -90, hjust = 0))
+
+
+grp1 <- analysis[,c(5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23)]
+grp1[is.na(grp1)] <- 0
+grp1$EMS <- analysis$ControlType == "ems"
+grp1$RAN <- analysis$ControlType == "ran"
+grp1$MOI <- analysis$ControlType == "moi"
+grp1$PositiveCase <- analysis$ControlType == "case"
+# correlation matrix for the two sets of 1-hot encoded variables
+cormat <- cor(grp1, grp1)
+melted_cormat <- melt(cormat)
+
+# Heatmap of the correlation matrix
+melted_cormat |> filter(!is.na(value)) |>
+  ggplot(aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  geom_text(aes(Var1, Var2, label = round(value,2)),
+          color = "white", size = 2) +
+  labs(x="", y="") +
+  theme(axis.text.x=element_text(angle = -90, hjust = 0))
+
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+
+
+analysis$ControlType <-  as.factor(analysis$ControlType)
+
+
+CtrlType <- analysis |> select(ControlType, LOC) |> filter(!is.na(LOC)) |> 
+  group_by(ControlType) |> summarize(tot=n(), LOC=sum(LOC))
+
+barplot(CtrlType$LOC/CtrlType$tot, names.arg=levels(analysis$ControlType), main="Loss of concioussness rate for different control groups", xlab="Loss of Con.", las = 1, horiz=TRUE)
+grid()
+
+plot(CtrlType$tot,CtrlType$LOC, main="", xlab="Number of Injuries", ylab="Number of LOCs")
+text(CtrlType$tot+4, CtrlType$LOC+3, labels=CtrlType$ControlType, cex=0.5)
+abline(lm(CtrlType$LOC~CtrlType$tot-1))
+grid()
+
+```
+
+```{r}
+
+SiteType <- analysis |> select(SITE, ControlType) |> filter(!is.na(ControlType)) |> 
+  group_by(SITE) |> summarize(tot=n(), TypeCase=sum(ControlType=="case"), TypeRan=sum(ControlType=="ran") , TypeEms=sum(ControlType=="ems"), TypeMoi=sum(ControlType=="moi"), TypeNonCase=sum(ControlType!="case"))
+
+barplot(SiteType$TypeCase/SiteType$tot, names.arg=SiteType$SITE, main="Case Rate for different Sites", xlab="positive case rate", las = 1, horiz=TRUE)
+grid()
+
+plot(SiteType$tot,SiteType$TypeCase, main="", xlab="Number of Patients", ylab="Number of Positive Cases")
+text(SiteType$tot+2, SiteType$TypeCase+1, labels=SiteType$SITE, cex=0.5)
+abline(lm(SiteType$TypeCase~SiteType$tot -1))
+grid()
+```
+
+
+
