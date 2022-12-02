@@ -1,0 +1,184 @@
+---
+title: "ReplicateDecisionRule"
+date: "11/29/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+```
+
+## Replicate Decision Rule 
+
+
+
+```{r }
+av <- read.csv("C:/Users/kaitl/Downloads/CSpine/CSV datasets/analysisvariables.csv")
+radiology <- read.csv("C:/Users/kaitl/Downloads/CSpine/CSV datasets/radiologyreview.csv")
+injury <- read.csv("C:/Users/kaitl/Downloads/CSpine/CSV datasets/injuryclassification.csv")
+site <- read.csv("C:/Users/kaitl/Downloads/CSpine/CSV datasets/clinicalpresentationsite.csv")
+ems <- read.csv("C:/Users/kaitl/Downloads/CSpine/CSV datasets/clinicalpresentationfield.csv")
+outside <- read.csv("C:/Users/kaitl/Downloads/CSpine/CSV datasets/clinicalpresentationoutside.csv")
+```
+
+
+
+
+## Forward Selection Logistic Regression
+
+
+
+```{r}
+forward <- function(vals, df){
+  # https://v8doc.sas.com/sashtml/stat/chap55/sect29.htm#:~:text=Forward%20Selection%20(FORWARD),model%20if%20it%20is%20included.
+  # This method was implemented to replicate the FORWARD method in SAS, which was used in the paper
+  
+  coeffs = "1"
+  coeffs_list = c()
+  run <- TRUE 
+  
+  while (run & length(vals) > 0){
+    
+    init.p.vals <- rep(10000,length(vals))
+    
+    for (i in 1:length(vals)){
+      temp.coeff <- paste(paste(coeffs, "+"), vals[i])
+      lm.null <- glm(paste("y ~ ", coeffs), data = df, family = "binomial")
+
+      lm <- glm(paste("y ~ ", temp.coeff), data = df, family = "binomial")
+      
+      # get p value from chi-squared test 
+      if (!(is.na((anova(lm.null, lm, test="Chisq"))[2,5]))){
+        init.p.vals[i] <- (anova(lm.null, lm, test="Chisq"))[2,5]
+      }
+      
+    }
+
+
+    
+    if (min(init.p.vals) < 0.05){
+      # add coefficient with smallest p-value:
+      coeffs <- paste(paste(coeffs, "+"), vals[which(init.p.vals == min(init.p.vals))])
+      coeffs_list <- append(coeffs_list, vals[which(init.p.vals == min(init.p.vals))])
+      
+      # remove that coefficient from the list of possible coefficients 
+      vals <- vals[-which(init.p.vals == min(init.p.vals))]
+      
+    }
+    else{
+      run <- FALSE
+    }
+  }
+  return(list(coeffs, coeffs_list))
+
+}
+
+```
+
+
+```{r}
+vars <- colnames(av)[5:26]
+
+av.test <- av %>% drop_na(vars)
+
+y <- unlist(lapply(av.test$ControlType, function(x){
+  if (x == "case")
+    {return (1)} 
+  else 0}))
+
+av.test$y <- y
+
+av.test <- av.test[av.test$ControlType == "moi"| av.test$ControlType == "case", ]
+
+coeff_final <- forward(vars, av.test)
+```
+
+```{r}
+
+# bootstrap experiments 
+set.seed(215)
+
+counts <- rep(0,length(vars))
+
+for (i in 1:50){
+  boot <- av.test[sample(nrow(av.test), 1000, replace = TRUE), ]
+  coeffs_out <- forward(vars, boot)
+
+  
+  coeffs_list <- coeffs_out[[2]]
+  
+  for (coeff in coeffs_list){
+    ind <- which(vars == coeff)
+    counts[ind] <- counts[ind] + 1
+  }
+  
+}
+
+counts / 50
+```
+
+```{r}
+# These are the coefficients selected in forward selection
+vars[counts > 25]
+```
+
+# Sensitivity Calculations: Decision Rule from Paper 
+
+```{r}
+# sensitivity 
+vars <- colnames(av)[5:26]
+
+av.sense <- av %>% drop_na(vars) %>% filter(ControlType == "case")
+
+tp <- av.sense %>% filter(AlteredMentalStatus == 1 | FocalNeuroFindings == 1 |  PainNeck == 1| SubInj_TorsoTrunk == 1 | 
+HighriskDiving == 1 |HighriskMVC == 1)
+ 
+
+sensitivity <- DescTools::BinomCI(nrow(tp), n = nrow(av.sense), method = "wald", conf.level = 0.95)
+
+# as specified in the paper, we drop any rows where any of the 
+# indicators are missing 
+av.spec <- av %>% drop_na(vars) %>% filter(ControlType != "case")
+
+tn <- av.spec %>% filter(AlteredMentalStatus == 0 & FocalNeuroFindings == 0 & PainNeck == 0 & SubInj_TorsoTrunk == 0 & HighriskDiving == 0 & HighriskMVC == 0)
+
+specificity <- DescTools::BinomCI(nrow(tn), n = nrow(av.spec), method = "wald", conf.level = 0.95)
+
+
+df <- rbind(sensitivity, specificity)
+colnames(df) <- c("Estimage", "Lower CI Bound", "Upper CI Bound")
+rownames(df) <- c("Sensitivity", "Specificity")
+df
+```
+
+# Sensitivity Calculations from Decision Rule I Found using Forward Selection
+
+```{r}
+av.sense <- av %>% drop_na(vars) %>% filter(ControlType == "case")
+
+tp <- av.sense %>% filter(AlteredMentalStatus == 1 |  FocalNeuroFindings == 1 | PainNeck == 1 |             SubInj_TorsoTrunk == 1 | Predisposed == 1 | HighriskDiving == 1 | HighriskHitByCar == 1 | HighriskMVC == 1 |        
+ axialloadtop == 1 | Clotheslining == 1)
+ 
+
+sensitivity <- DescTools::BinomCI(nrow(tp), n = nrow(av.sense), method = "wald", conf.level = 0.95)
+
+# as specified in the paper, we drop any rows where any of the 
+# indicators are missing 
+av.spec <- av %>% drop_na(vars) %>% filter(ControlType != "case")
+
+tn <- av.spec %>% filter(AlteredMentalStatus != 1 &  FocalNeuroFindings != 1 & PainNeck != 1 &            SubInj_TorsoTrunk != 1 & Predisposed != 1 & HighriskDiving != 1 & HighriskHitByCar != 1 & HighriskMVC != 1 &        
+ axialloadtop != 1 & Clotheslining != 1)
+
+specificity <- DescTools::BinomCI(nrow(tn), n = nrow(av.spec), method = "wald", conf.level = 0.95)
+
+
+df <- rbind(sensitivity, specificity)
+colnames(df) <- c("Estimage", "Lower CI Bound", "Upper CI Bound")
+rownames(df) <- c("Sensitivity", "Specificity")
+df
+```
+
+
+
