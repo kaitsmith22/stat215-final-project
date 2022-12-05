@@ -2,7 +2,7 @@
 
 metrics <- function(truth, classPreds){
   tp <- sum(truth & classPreds==1)
-  tn <- sum(truth & classPreds!=1)
+  tn <- sum(!truth & classPreds!=1)
   sensitivity <- DescTools::BinomCI((tp), n = sum(truth), method = "wald", conf.level = 0.95)
   specificity <- DescTools::BinomCI((tn), n = sum(!truth), method = "wald", conf.level = 0.95)
   
