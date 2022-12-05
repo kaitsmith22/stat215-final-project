@@ -1,0 +1,118 @@
+---
+title: "Learning and Evaluating Clinical Decision Rules for Cervical Spine Injury"
+author: "Jaewon Saw, Jeffrey Cheng, Ahmed Eldeeb, and Kaitlin Smith"
+date: 'December, 2022'
+header-includes:
+   - \usepackage{float}
+   - \usepackage{booktabs}
+output: 
+  pdf_document:
+    number_sections: true
+
+---
+
+```{r setup, echo = FALSE, message=FALSE, warning=FALSE}
+# load in useful packages
+library(tidyverse)
+library(forcats)
+library(lubridate)
+library(stringr)
+library(RColorBrewer)
+library(ggpubr)
+library("reshape")
+library(formatR)
+R.utils::sourceDirectory("./R/", modifiedOnly = F, recursive = F) # useful functions
+
+# set default knitr chunks
+knitr::opts_chunk$set(
+  echo = FALSE,  # don't print the code chunk
+  warning = FALSE,  # don't print warnings
+  message = FALSE,  # don't print messages
+  fig.width = 6,  # set default width of figures
+  fig.height = 4,  # set default height of figures
+  fig.align = "center",  # always align figure in center
+  fig.pos = "H",  # always plot figure at the exact location of the code chunk
+  cache = FALSE)  # don't cache results
+```
+
+## Introduction
+
+Introduce the domain problem for the dataset you have selected. Motivate why this is
+a relevant problem to solve and give some background of previous work in the area.
+
+## Data
+
+ Download the raw data. Detail your data cleaning process and document all judgement calls
+made. Describe the features in the processed data and the outcome features. Detail how you will split
+the data for the development and testing of your new clinical decision rule. Select a hold out test set
+that will reflect how the model will be used in practice.
+
+### Data Collection
+
+What are the most relevant data to collect to answer your domain question?
+Ideas from experimental design (a subfield of statistics) and active learning (a subfield of machine learning)
+are useful here. The above question is good to ask even if the data has already been collected because
+understanding the ideal data collection process might reveal shortcomings of the actual data collection
+process and shed light on analysis steps to follow.
+The questions below are useful to ask: How were the data collected? At what locations? Over what time
+period? Who collected them? What instruments were used? Have the operators and instruments changed
+over the period? Try to imagine yourself at the data collection site physically.
+
+### Meaning
+
+What does each variable mean in the data? What does it measure? Does it measure what it is supposed
+to measure? How could things go wrong? What statistical assumptions is one making by assuming things
+didnât go wrong? (Knowing the data collection process helps here.)
+Meaning of each variable – ask students to imagine being there at the ER and giving a Glasgow coma score,
+for example, and also a couple of variables – ask students what could cause different values written down.
+How were the data cleaned? By whom?
+
+### Relevance
+
+Can the data collected answer the substantive question(s) in whole or in part? If not, what other data should
+one collect? The points made in (3.2) are pertinent here.
+
+## Modelling 
+
+ Implement the baseline clinical decision rule from the original paper for the dataset you
+selected. Develop and implement a newly derived model for the dataset. Explain in detail how you
+developed your model, and describe any intermediate models you did not end up using that led to your
+final model.
+
+
+## Interpretation
+
+ Examine the interpretability of your model. This should help clinical practitioners
+use your model in practice. Is your model a simple interpretable form? If not, how do you recommend
+interpreting how it obtains the predictions it does?
+
+## Stability with Model Perterbation
+
+ Introduce a perturbation to your final model, and summarize
+the effects of this perturbation on the predictions of your model.
+
+
+## Stability with Data Perterbation
+
+ Study your final model under three perturbations of the data:
+– What happens if the covariate distribution of the test set changes from what the model was trained
+on? Simulate this and present the implications for your model.
+– What happens if your model is used on only a subgroup of the patients the model was trained
+on? Simulate this and present the implications for your model.
+– Create an additional stability check and show how it affects your model.
+
+## Comparability 
+
+Are the data units comparable or normalized so that they can be treated as if they were exchangeable? Or
+are apples and oranges being combined? Are the data units independent? Are any two columns of data
+duplicates of the same variable
+
+## Evaluation
+
+ On your held out test set, evaluate and present the final performance of your model. Is
+the accuracy similar to that in the training/validation sets? If not is there any pattern in the errors?
+Discuss the implications this evaluation has for any possible use of your model in real life.
+
+## Conclusion
+
+## Works Cited 
