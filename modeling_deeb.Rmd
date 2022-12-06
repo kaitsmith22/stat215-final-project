@@ -1,0 +1,232 @@
+---
+title: "Modeling Experiments (with site-CV)"
+date: "12/5/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+
+source("./routines.R")
+```
+
+## Replicate Decision Rule 
+
+
+
+```{r }
+av <- read.csv("./CSpine/CSV datasets/analysisvariables.csv")
+radiology <- read.csv("./CSpine/CSV datasets/radiologyreview.csv")
+injury <- read.csv("./CSpine/CSV datasets/injuryclassification.csv")
+site <- read.csv("./CSpine/CSV datasets/clinicalpresentationsite.csv")
+ems <- read.csv("./CSpine/CSV datasets/clinicalpresentationfield.csv")
+outside <- read.csv("./CSpine/CSV datasets/clinicalpresentationoutside.csv")
+```
+
+
+
+# Sensitivity Calculations: Decision Rule from Paper 
+
+```{r}
+# sensitivity 
+vars <- colnames(av)[5:26]
+
+av.sense <- av %>% drop_na(vars) %>% filter(ControlType == "case")
+
+tp <- av.sense %>% filter(AlteredMentalStatus == 1 | FocalNeuroFindings == 1 |  PainNeck == 1| SubInj_TorsoTrunk == 1 | 
+HighriskDiving == 1 |HighriskMVC == 1)
+ 
+
+sensitivity <- DescTools::BinomCI(nrow(tp), n = nrow(av.sense), method = "wald", conf.level = 0.95)
+
+# as specified in the paper, we drop any rows where any of the 
+# indicators are missing 
+av.spec <- av %>% drop_na(vars) %>% filter(ControlType != "case")
+
+tn <- av.spec %>% filter(AlteredMentalStatus == 0 & FocalNeuroFindings == 0 & PainNeck == 0 & SubInj_TorsoTrunk == 0 & HighriskDiving == 0 & HighriskMVC == 0)
+
+specificity <- DescTools::BinomCI(nrow(tn), n = nrow(av.spec), method = "wald", conf.level = 0.95)
+
+
+df <- rbind(sensitivity, specificity)
+colnames(df) <- c("Estimage", "Lower CI Bound", "Upper CI Bound")
+rownames(df) <- c("Sensitivity", "Specificity")
+df
+```
+
+# Sensitivity Calculations from Decision Rule I Found using Forward Selection
+
+```{r}
+av.sense <- av %>% drop_na(vars) %>% filter(ControlType == "case")
+
+tp <- av.sense %>% filter(AlteredMentalStatus == 1 |  FocalNeuroFindings == 1 | PainNeck == 1 |             SubInj_TorsoTrunk == 1 | Predisposed == 1 | HighriskDiving == 1 | HighriskHitByCar == 1 | HighriskMVC == 1 |        
+ axialloadtop == 1 | Clotheslining == 1)
+ 
+
+sensitivity <- DescTools::BinomCI(nrow(tp), n = nrow(av.sense), method = "wald", conf.level = 0.95)
+
+# as specified in the paper, we drop any rows where any of the 
+# indicators are missing 
+av.spec <- av %>% drop_na(vars) %>% filter(ControlType != "case")
+
+tn <- av.spec %>% filter(AlteredMentalStatus != 1 &  FocalNeuroFindings != 1 & PainNeck != 1 &            SubInj_TorsoTrunk != 1 & Predisposed != 1 & HighriskDiving != 1 & HighriskHitByCar != 1 & HighriskMVC != 1 &        
+ axialloadtop != 1 & Clotheslining != 1)
+
+specificity <- DescTools::BinomCI(nrow(tn), n = nrow(av.spec), method = "wald", conf.level = 0.95)
+
+
+df <- rbind(sensitivity, specificity)
+colnames(df) <- c("Estimage", "Lower CI Bound", "Upper CI Bound")
+rownames(df) <- c("Sensitivity", "Specificity")
+df
+```
+
+```{r}
+
+# convenience subsets (avn excludes the 3 sites, and avnn excludes NAs)
+
+avn <- av[av$SITE != 15 & av$SITE != 16 & av$SITE != 7,]
+
+avn_reprod <-  as.numeric(avn$AlteredMentalStatus == 1 |  avn$FocalNeuroFindings == 1 | 
+                            avn$PainNeck == 1 | avn$SubInj_TorsoTrunk == 1 | avn$Predisposed == 1 |
+                            avn$HighriskDiving == 1 | avn$HighriskHitByCar == 1 | 
+                            avn$HighriskMVC == 1 |   avn$axialloadtop == 1 | avn$Clotheslining == 1)
+
+avn_reprod2 <- as.numeric(avn$AlteredMentalStatus == 1 | avn$FocalNeuroFindings == 1 |  
+                            avn$PainNeck == 1| avn$SubInj_TorsoTrunk == 1 | 
+                            avn$HighriskDiving == 1 |avn$HighriskMVC == 1)
+
+
+avnn<- avn %>% drop_na(vars)
+
+avnn_reprod <-  as.numeric(avnn$AlteredMentalStatus == 1 |  avnn$FocalNeuroFindings == 1 | 
+                            avnn$PainNeck == 1 | avnn$SubInj_TorsoTrunk == 1 | avnn$Predisposed == 1 |
+                            avnn$HighriskDiving == 1 | avnn$HighriskHitByCar == 1 | 
+                            avnn$HighriskMVC == 1 |   avnn$axialloadtop == 1 | avnn$Clotheslining == 1)
+
+avnn_reprod2 <- as.numeric(avnn$AlteredMentalStatus == 1 | avnn$FocalNeuroFindings == 1 |  
+                            avnn$PainNeck == 1| avnn$SubInj_TorsoTrunk == 1 | 
+                            avnn$HighriskDiving == 1 |avnn$HighriskMVC == 1)
+
+
+metrics(avnn$ControlType == "case", avnn_reprod)
+metrics(avnn$ControlType == "case", avnn_reprod2)
+```
+
+
+## Single tree (site-CV)
+
+```{r}
+
+avnn<- avn %>% drop_na(vars)
+
+num_preds <- rep(0, nrow(avnn))
+class_preds <- rep(0, nrow(avnn))
+
+#num_preds <- rep(0, nrow(avn))
+#class_preds <- rep(0, nrow(avn))
+
+for (i in unique(avn$SITE)){
+  train <-  avn[avn$SITE!=i,]
+  test <-  avnn[avnn$SITE==i,]
+  
+  tree.1 <- rpart(as.numeric(ControlType == "case")~. - SITE - StudySubjectID - CaseID, 
+                  data=train, 
+                  #weights = (as.numeric(ControlType != "case")+1),
+                  method="class",
+                  parms = list(prior = c(.32,.68)))
+  
+  num_preds[avnn$SITE==i] <-  predict(tree.1, newdata=test)[,1]
+  class_preds[avnn$SITE==i] <-  as.numeric(predict(tree.1, newdata=test, type="class"))-1
+}
+
+rocs(avnn$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
+metrics(avnn$ControlType == "case", class_preds)
+
+```
+## Gradient boosted trees or stubs (site-CV)
+
+```{r}
+
+avnn<- avn %>% drop_na(vars)
+
+num_preds <- rep(0, nrow(avnn))
+class_preds <- rep(0, nrow(avnn))
+
+for (i in unique(avn$SITE)){
+  train <-  avn[avn$SITE!=i,]
+  test <-  avnn[avnn$SITE==i,]
+  
+  gbm.1 <- gbm(as.numeric(ControlType == "case")~. - SITE - StudySubjectID - CaseID, data=train,
+             distribution = "bernoulli",
+              n.trees = 90,
+              interaction.depth = 2,
+              n.minobsinnode = 50,
+              shrinkage = 0.1,
+              bag.fraction = 0.7,
+              train.fraction = 0.9,
+              cv.folds = 7,
+              verbose = F,
+              n.cores = 5)
+
+  num_preds[avnn$SITE==i] <-  predict(gbm.1, type = "response", newdata=test)
+}
+
+class_preds <- as.numeric(num_preds > 0.087)
+
+rocs(avnn$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
+metrics(avnn$ControlType == "case", class_preds)
+
+```
+
+## Logistic regression (with all vars or vars from feature selection):
+
+```{r}
+
+avnn<- avn %>% drop_na(vars)
+
+num_preds <- rep(0, nrow(avnn))
+class_preds <- rep(0, nrow(avnn))
+
+
+#  [1] "AlteredMentalStatus" "FocalNeuroFindings"  "HighriskDiving"      "HighriskHitByCar"
+#  [5] "HighriskMVC"         "PainNeck2"           "Predisposed"         "SubInj_TorsoTrunk"
+#  [9] "FocalNeuroFindings2" "axialloadtop"        "Torticollis2"        "LOC"
+# [13] "HighriskOtherMV"     "Clotheslining"       "SubInj_Head"         "AxialLoadAnyDoc"
+
+
+#  [1] "AlteredMentalStatus" "FocalNeuroFindings"  "SubInj_Head"         "SubInj_TorsoTrunk"  
+#  [5] "Predisposed"         "HighriskDiving"      "HighriskHitByCar"    "HighriskMVC"        
+#  [9] "HighriskOtherMV"     "AxialLoadAnyDoc"     "axialloadtop"        "FocalNeuroFindings2"
+# [13] "PainNeck2"           "Torticollis2"        "subinj_Head2"        "subinj_Face2"  
+
+
+for (i in unique(avnn$SITE)){
+  train <-  avnn[avnn$SITE!=i,]
+  test <-  avnn[avnn$SITE==i,]
+
+  #lm.1 <- glm(as.numeric(ControlType == "case")~ .- SITE - StudySubjectID - CaseID, 
+  #          data = train, family = "binomial")
+  
+  lm.1 <- glm(as.numeric(ControlType == "case")~ AlteredMentalStatus + FocalNeuroFindings + HighriskHitByCar +
+                HighriskMVC + PainNeck2 + Predisposed + SubInj_TorsoTrunk + FocalNeuroFindings2 +
+                axialloadtop + Torticollis2 + LOC + HighriskOtherMV + Clotheslining + 
+                subinj_Face2 + AxialLoadAnyDoc, 
+            data = train, family = "binomial")
+
+  num_preds[avnn$SITE==i] <-  predict(lm.1, type = "response", newdata=test)
+}
+
+class_preds <- as.numeric(num_preds > 0.079)
+
+rocs(avnn$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
+metrics(avnn$ControlType == "case", class_preds)
+
+```
+
+
+
+
+

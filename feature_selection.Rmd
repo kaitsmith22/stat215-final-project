@@ -1,0 +1,174 @@
+---
+title: "Feature Selection"
+date: "12/5/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+```
+
+## Replicate Decision Rule 
+
+
+
+```{r }
+av <- read.csv("./CSpine/CSV datasets/analysisvariables.csv")
+radiology <- read.csv("./CSpine/CSV datasets/radiologyreview.csv")
+injury <- read.csv("./CSpine/CSV datasets/injuryclassification.csv")
+site <- read.csv("./CSpine/CSV datasets/clinicalpresentationsite.csv")
+ems <- read.csv("./CSpine/CSV datasets/clinicalpresentationfield.csv")
+outside <- read.csv("./CSpine/CSV datasets/clinicalpresentationoutside.csv")
+```
+
+
+
+## Forward Selection Logistic Regression
+
+
+```{r}
+forward <- function(vals, df){
+  # https://v8doc.sas.com/sashtml/stat/chap55/sect29.htm#:~:text=Forward%20Selection%20(FORWARD),model%20if%20it%20is%20included.
+  # This method was implemented to replicate the FORWARD method in SAS, which was used in the paper
+  
+  coeffs = "1"
+  coeffs_list = c()
+  run <- TRUE 
+  
+  while (run & length(vals) > 0){
+    
+    init.p.vals <- rep(10000,length(vals))
+    
+    for (i in 1:length(vals)){
+      temp.coeff <- paste(paste(coeffs, "+"), vals[i])
+      lm.null <- glm(paste("y ~ ", coeffs), data = df, family = "binomial")
+
+      lm <- glm(paste("y ~ ", temp.coeff), data = df, family = "binomial")
+      
+      # get p value from chi-squared test 
+      if (!(is.na((anova(lm.null, lm, test="Chisq"))[2,5]))){
+        init.p.vals[i] <- (anova(lm.null, lm, test="Chisq"))[2,5]
+      }
+      
+    }
+
+
+    
+    if (min(init.p.vals) < 0.15){
+      # add coefficient with smallest p-value:
+      coeffs <- paste(paste(coeffs, "+"), vals[which(init.p.vals == min(init.p.vals))])
+      coeffs_list <- append(coeffs_list, vals[which(init.p.vals == min(init.p.vals))])
+      
+      # remove that coefficient from the list of possible coefficients 
+      vals <- vals[-which(init.p.vals == min(init.p.vals))]
+      
+    }
+    else{
+      run <- FALSE
+    }
+  }
+  return(list(coeffs, coeffs_list))
+
+}
+
+```
+
+
+```{r}
+vars <- colnames(av)[5:26]
+#vars <- colnames(av)[5:35]
+
+av.test <- av %>% drop_na(vars)
+
+y <- unlist(lapply(av.test$ControlType, function(x){
+  if (x == "case")
+    {return (1)} 
+  else 0}))
+
+av.test$y <- y
+
+av.test <- av.test[av.test$ControlType == "moi"| av.test$ControlType == "case", ]
+
+coeff_final <- forward(vars, av.test)
+```
+
+```{r bootstrap}
+
+# bootstrap experiments 
+set.seed(215)
+reps <- 20
+
+counts <- rep(0,length(vars))
+
+for (i in 1:reps){
+  boot <- av.test[sample(nrow(av.test), 1000, replace = TRUE), ]
+  coeffs_out <- forward(vars, boot)
+
+  coeffs_list <- coeffs_out[[2]]
+  
+  for (coeff in coeffs_list){
+    ind <- which(vars == coeff)
+    counts[ind] <- counts[ind] + 1
+  }
+  
+  print(i)
+}
+
+counts / reps
+```
+
+```{r}
+# These are the coefficients selected in forward selection
+vars[counts/reps > .45]
+new <- data.frame(vars, counts) |> arrange(desc(counts))
+new[new$counts/reps > .45,]$vars
+```
+
+
+
+```{r lasso}
+
+library(glmnet)
+
+avn <- av[av$SITE != 15 & av$SITE != 16 & av$SITE != 7,]
+avnn<- avn %>% drop_na(vars)
+
+vars <- colnames(av)[5:35]
+X <- as.matrix(avnn[, vars])
+colnames(X)
+y <- as.numeric(avnn$ControlType == "case")
+
+#  [1] "AlteredMentalStatus" "FocalNeuroFindings"  "SubInj_Head"         "SubInj_TorsoTrunk"  
+#  [5] "Predisposed"         "HighriskDiving"      "HighriskHitByCar"    "HighriskMVC"        
+#  [9] "HighriskOtherMV"     "AxialLoadAnyDoc"     "axialloadtop"        "FocalNeuroFindings2"
+# [13] "PainNeck2"           "Torticollis2"        "subinj_Head2"        "subinj_Face2"     
+
+lasso_reg <- glmnet(X,  y = y, family = binomial(link = "probit"), 
+                        alpha = 1,
+                        grouped = TRUE,
+                        keep = FALSE,
+                        parallel = T,
+                        relax = FALSE,
+                        standardize = TRUE)
+
+
+plot(lasso_reg, xvar="lambda", label=T, axes=T)
+grid()
+
+plot(lasso_reg, xvar="norm", label=T, axes=T)
+grid()
+
+
+lasso_model <- glmnet(x = X, y = y, alpha = 1, lambda = exp(-5.2), standardize = TRUE)
+lasso_model$beta[,1][lasso_model$beta[,1]>0]
+names(lasso_model$beta[,1][lasso_model$beta[,1]>0])
+
+```
+
+
+
+
+
+
