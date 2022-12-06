@@ -1,0 +1,104 @@
+---
+title: "LASSO Feature Selection"
+date: '2022-12-05'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(glmnet)
+
+source("./routines.R")
+```
+
+## Lasso  Feature Selection and Cross Validation
+
+```{r}
+av <- read.csv("C:/Users/kaitl/Downloads/CSpine/CSV datasets/analysisvariables.csv")
+
+vars <- colnames(av)[5:ncol(av)]
+
+# remove testing data
+data_train <- av %>% filter(SITE != 5 & SITE != 16 & SITE != 15)
+
+y <- unlist(lapply(data_train$ControlType, function(x){
+  if (x == "case")
+    {return (1)} 
+  else 0}))
+
+data_train$y <- y
+
+
+dat_no_na <- data_train[rowSums(is.na(data_train)) == 0, ]
+
+```
+
+```{r}
+# Setting alpha = 1 implements lasso regression
+X <- dat_no_na[, vars]
+
+# find value of lambda that minimizes the deviance
+lasso_reg <- glmnet::cv.glmnet(as.matrix(X),  y = dat_no_na$y, alpha = 1, standardize = TRUE, nfolds = 14)
+
+lambda_best <- lasso_reg$lambda.min
+
+# get baseline deicsion rule results 
+avnn_reprod <-  as.numeric(dat_no_na$AlteredMentalStatus == 1 |  dat_no_na$FocalNeuroFindings == 1 | 
+                            dat_no_na$PainNeck == 1 | dat_no_na$SubInj_TorsoTrunk == 1 | dat_no_na$Predisposed == 1 |
+                            dat_no_na$HighriskDiving == 1 | dat_no_na$HighriskHitByCar == 1 | 
+                            dat_no_na$HighriskMVC == 1 |   dat_no_na$axialloadtop == 1 | dat_no_na$Clotheslining == 1)
+
+avnn_reprod2 <- as.numeric(dat_no_na$AlteredMentalStatus == 1 | dat_no_na$FocalNeuroFindings == 1 |  
+                            dat_no_na$PainNeck == 1| dat_no_na$SubInj_TorsoTrunk == 1 | 
+                            dat_no_na$HighriskDiving == 1 |dat_no_na$HighriskMVC == 1)
+```
+
+
+## Feature Selection
+
+```{r}
+# get lasso model with optimal performance found with cross validation
+
+lasso_model <- glmnet(x = X, y = dat_no_na$y, alpha = 1, standardize = TRUE)
+
+ord <- lasso_model$beta
+
+sum_0 <- apply(ord, MARGIN = 1, function(r){
+  return(sum(r == 0))
+})
+
+# get features in the order they are added to the model
+sorted_sum <- data.frame(sort(sum_0))
+
+# plot of when features are added
+plot(lasso_model,label=TRUE, axes = T)
+```
+
+
+## Cross Validation
+
+```{r }
+
+# get cross validation results for the different sites
+
+num_preds <- rep(0, nrow(dat_no_na))
+class_preds <- rep(0, nrow(dat_no_na))
+
+for (i in unique(dat_no_na$SITE)){
+  train <-  dat_no_na[dat_no_na$SITE!=i,]
+  test <-  dat_no_na[dat_no_na$SITE==i,]
+  
+  X <- train[, vars]
+  X_test <- test[, vars]
+  
+  lasso_model <- glmnet(x = X, y = train$y, alpha = 1, lambda = lambda_best, standardize = TRUE)
+  
+  num_preds[dat_no_na$SITE==i] <-  predict(lasso_model, type = "response", newx = as.matrix(X_test))
+  
+}
+
+class_preds <- as.numeric(num_preds > 0.085)
+rocs(dat_no_na$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
+metrics(dat_no_na$ControlType == "case", class_preds)
+```
