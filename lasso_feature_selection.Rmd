@@ -15,7 +15,7 @@ source("./routines.R")
 ## Lasso  Feature Selection and Cross Validation
 
 ```{r}
-av <- read.csv("C:/Users/kaitl/Downloads/CSpine/CSV datasets/analysisvariables.csv")
+av <- read.csv("./CSpine/CSV datasets/analysisvariables.csv")
 
 vars <- colnames(av)[5:ncol(av)]
 
