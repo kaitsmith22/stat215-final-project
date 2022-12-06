@@ -137,7 +137,7 @@ avnn<- avn %>% drop_na(vars)
 
 vars <- colnames(av)[5:35]
 X <- as.matrix(avnn[, vars])
-colnames(X)
+# colnames(X)
 y <- as.numeric(avnn$ControlType == "case")
 
 #  [1] "AlteredMentalStatus" "FocalNeuroFindings"  "SubInj_Head"         "SubInj_TorsoTrunk"  

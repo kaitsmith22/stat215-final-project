@@ -1,0 +1,98 @@
+---
+title: "Learning and Evaluating Clinical Decision Rules for Cervical Spine Injury"
+author: "Jaewon Saw, Jeffrey Cheng, Ahmed Eldeeb, and Kaitlin Smith"
+date: 'December, 2022'
+header-includes:
+   - \usepackage{float}
+   - \usepackage{booktabs}
+output: 
+  pdf_document:
+    number_sections: true
+
+---
+
+```{r setup, echo = FALSE, message=FALSE, warning=FALSE}
+# load in useful packages
+library(tidyverse)
+library(forcats)
+library(lubridate)
+library(stringr)
+library(RColorBrewer)
+library(ggpubr)
+library("reshape")
+library(formatR)
+# R.utils::sourceDirectory("./R/", modifiedOnly = F, recursive = F) # useful functions
+
+# set default knitr chunks
+knitr::opts_chunk$set(
+  echo = FALSE,  # don't print the code chunk
+  warning = FALSE,  # don't print warnings
+  message = FALSE,  # don't print messages
+  fig.width = 6,  # set default width of figures
+  fig.height = 4,  # set default height of figures
+  fig.align = "center",  # always align figure in center
+  fig.pos = "H",  # always plot figure at the exact location of the code chunk
+  cache = FALSE)  # don't cache results
+```
+
+# Introduction
+
+The goal of this project is to create a clinical decision rule to identify 
+children who are most likely to have a cervical spine injury (CSI). The adverse 
+effects of immobilizing children and subjecting children to ionizing radiation 
+motivates such a rule, as there is a desire to minimize the number of children 
+unnecessarily subject to radiographic assessment while continuing to maintain 
+high sensitivity.
+
+# Data
+
+## Data Collection
+The data was taken from the Pediatric Emergency Care Applied Research Network 
+(PECARN) public use dataset titled "Predicting Cervical Spine Injury (CSI) in 
+Children: A Multi-Centered Case-Control Analysis". A total of 17 PECARN sites 
+participated in the study, with a total of 3,314 subjects included in this 
+dataset. This dataset was collected between January 2000 and December 2004 and 
+was initially procured for the purpose of creating a decision rule for 
+identifying factors associated with CSI. The results for this study are 
+presented in "Factors Associated With Cervical Spine Injury in Children After
+Blunt Trauma" by Leonard et al.
+
+Of the 3,314 records, 540 are deemed positive cervical spine injuries from 
+radiology reports or spine consultation. These positive injury records were 
+verified by the principal investigator of Leonard et al. and by a pediatric 
+neurosurgeon[CITATION]. The remaining 2,774 controls fall into three control 
+groups: 1,060 unmatched random controls, 1,012 mechanism-of-injury and age 
+matched controls, and 702 age-matched EMS controls. 
+
+Leonard et al. 8 major variables that are associated with CSI: altered mental 
+status, focal neurological deficits, complaint of neck pain, torticollis,
+substantial injury to the torso, predisposing condition, high-risk motor vehicle
+crash, and diving. Our analyses focused on these factors, as these were the only 
+clinical variables that were provided for all 3,314 records.
+
+## Cleaning
+From the original PECARN public use dataset, the amount of cleaning depended on 
+the classifier used. The baseline rule from Leonard et al. and decision trees 
+were both tolerant of missing data, so no additional cleaning was done for these 
+processes. For the LASSO selection of variables and logistic regression, records 
+with missing values were removed from the analysis. 
+
+## Training and Evaluation Split
+We assume that in practice, our decision rule will be deployed at hospitals not 
+included in the dataset. Then, to simulate the performance of the models in 
+practice, the data was split into test and training sets based on sites. 
+
+Sites 5, 16, and 17 were randomly chosen as the evaluation sites. 
+Leave-one-out-cross-validation (LOOCV) was conducted over the remaining sites 
+during training. 
+
+# Stability
+
+## Model Perturbation
+
+## Data Perturbation
+
+
+
+
+

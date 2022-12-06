@@ -1,0 +1,153 @@
+---
+title: "stability"
+author: "Jeffrey Cheng"
+date: "2022-12-06"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+
+source("./routines.R")
+```
+
+
+
+```{r }
+av <- read.csv("./CSpine/CSV datasets/analysisvariables.csv")
+radiology <- read.csv("./CSpine/CSV datasets/radiologyreview.csv")
+injury <- read.csv("./CSpine/CSV datasets/injuryclassification.csv")
+site <- read.csv("./CSpine/CSV datasets/clinicalpresentationsite.csv")
+ems <- read.csv("./CSpine/CSV datasets/clinicalpresentationfield.csv")
+outside <- read.csv("./CSpine/CSV datasets/clinicalpresentationoutside.csv")
+```
+
+
+
+
+
+
+## Logistic regression (with all vars or vars from feature selection):
+
+```{r}
+
+avnn<- avn %>% drop_na(vars)
+
+num_preds <- rep(0, nrow(avnn))
+class_preds <- rep(0, nrow(avnn))
+
+
+#  [1] "AlteredMentalStatus" "FocalNeuroFindings"  "HighriskDiving"      "HighriskHitByCar"
+#  [5] "HighriskMVC"         "PainNeck2"           "Predisposed"         "SubInj_TorsoTrunk"
+#  [9] "FocalNeuroFindings2" "axialloadtop"        "Torticollis2"        "LOC"
+# [13] "HighriskOtherMV"     "Clotheslining"       "SubInj_Head"         "AxialLoadAnyDoc"
+
+
+#  [1] "AlteredMentalStatus" "FocalNeuroFindings"  "SubInj_Head"         "SubInj_TorsoTrunk"  
+#  [5] "Predisposed"         "HighriskDiving"      "HighriskHitByCar"    "HighriskMVC"        
+#  [9] "HighriskOtherMV"     "AxialLoadAnyDoc"     "axialloadtop"        "FocalNeuroFindings2"
+# [13] "PainNeck2"           "Torticollis2"        "subinj_Head2"        "subinj_Face2"  
+
+
+for (i in unique(avnn$SITE)){
+  train <-  avnn[avnn$SITE!=i,]
+  test <-  avnn[avnn$SITE==i,]
+
+  #lm.1 <- glm(as.numeric(ControlType == "case")~ .- SITE - StudySubjectID - CaseID, 
+  #          data = train, family = "binomial")
+  
+  lm.1 <- glm(as.numeric(ControlType == "case")~ AlteredMentalStatus + FocalNeuroFindings + HighriskHitByCar +
+                HighriskMVC + PainNeck2 + Predisposed + SubInj_TorsoTrunk + FocalNeuroFindings2 +
+                axialloadtop + Torticollis2 + LOC + HighriskOtherMV + Clotheslining + 
+                subinj_Face2 + AxialLoadAnyDoc, 
+            data = train, family = "binomial")
+
+  num_preds[avnn$SITE==i] <-  predict(lm.1, type = "response", newdata=test)
+}
+
+class_preds <- as.numeric(num_preds > 0.079)
+
+rocs(avnn$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
+metrics(avnn$ControlType == "case", class_preds)
+
+```
+
+## bootstrap for LASSO
+
+```{r}
+# do LASSO once for the selected features
+
+avn <- av[av$SITE != 15 & av$SITE != 16 & av$SITE != 7,]
+avnn<- avn %>% drop_na(vars)
+
+vars <- colnames(av)[5:35]
+X <- as.matrix(avnn[, vars])
+# colnames(X)
+y <- as.numeric(avnn$ControlType == "case")
+
+#  [1] "AlteredMentalStatus" "FocalNeuroFindings"  "SubInj_Head"         "SubInj_TorsoTrunk"  
+#  [5] "Predisposed"         "HighriskDiving"      "HighriskHitByCar"    "HighriskMVC"        
+#  [9] "HighriskOtherMV"     "AxialLoadAnyDoc"     "axialloadtop"        "FocalNeuroFindings2"
+# [13] "PainNeck2"           "Torticollis2"        "subinj_Head2"        "subinj_Face2"     
+
+lasso_reg <- glmnet(X,  y = y, family = binomial(link = "probit"), 
+                        alpha = 1,
+                        grouped = TRUE,
+                        keep = FALSE,
+                        parallel = T,
+                        relax = FALSE,
+                        standardize = TRUE)
+
+
+lasso_model <- glmnet(x = X, y = y, alpha = 1, lambda = exp(-5.2), standardize = TRUE)
+lasso_model$beta[,1][lasso_model$beta[,1]>0]
+selected_names = names(lasso_model$beta[,1][lasso_model$beta[,1]>0])
+
+selected_names_counts = integer(length(selected_names))
+
+
+# do 1000 bootstraps (sample with replacement)
+set.seed(1)
+n_bootstraps = 100
+for (i in 1:n_bootstraps){
+  avn <- av[av$SITE != 15 & av$SITE != 16 & av$SITE != 7,]
+  avn <- avn[sample(nrow(avn),size=nrow(avn),replace=TRUE),]
+  avnn<- avn %>% drop_na(vars)
+  
+  vars <- colnames(av)[5:35]
+  X <- as.matrix(avnn[, vars])
+  # colnames(X)
+  y <- as.numeric(avnn$ControlType == "case")
+  
+  #  [1] "AlteredMentalStatus" "FocalNeuroFindings"  "SubInj_Head"         "SubInj_TorsoTrunk"  
+  #  [5] "Predisposed"         "HighriskDiving"      "HighriskHitByCar"    "HighriskMVC"        
+  #  [9] "HighriskOtherMV"     "AxialLoadAnyDoc"     "axialloadtop"        "FocalNeuroFindings2"
+  # [13] "PainNeck2"           "Torticollis2"        "subinj_Head2"        "subinj_Face2"     
+  
+  lasso_reg <- glmnet(X,  y = y, family = binomial(link = "probit"), 
+                          alpha = 1,
+                          grouped = TRUE,
+                          keep = FALSE,
+                          parallel = T,
+                          relax = FALSE,
+                          standardize = TRUE)
+  
+  
+  lasso_model <- glmnet(x = X, y = y, alpha = 1, lambda = exp(-5.2), standardize = TRUE)
+  lasso_model$beta[,1][lasso_model$beta[,1]>0]
+  bootstrapped_names = names(lasso_model$beta[,1][lasso_model$beta[,1]>0])
+   
+  for (j in 1:length(selected_names)){
+    if (selected_names[j] %in% bootstrapped_names){
+      selected_names_counts[j] <- selected_names_counts[j] + 1
+    }
+  }
+  selected_names_freq <- selected_names_counts/n_bootstraps
+}
+names(selected_names_freq) <- selected_names
+
+barplot(selected_names_freq)
+```
+

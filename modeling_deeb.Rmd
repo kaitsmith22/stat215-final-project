@@ -119,7 +119,7 @@ metrics(avnn$ControlType == "case", avnn_reprod2)
 ## Single tree (site-CV)
 
 ```{r}
-
+library(rpart)
 avnn<- avn %>% drop_na(vars)
 
 num_preds <- rep(0, nrow(avnn))

@@ -39,25 +39,182 @@ knitr::opts_chunk$set(
 data_analysisvariables = read.csv("CSpine/CSV datasets/analysisvariables.csv", header = TRUE)
 data_demographics = read.csv("CSpine/CSV datasets/demographics.csv", header = TRUE)
 data_injuryclassification = read.csv("CSpine/CSV datasets/injuryclassification.csv", header = TRUE)
-data_injuryclassification = mutate(data_injuryclassification, CSFractures = as.integer(CSFractures=="Y"))
+
 
 # keep important columns
-data_demographics = data_demographics[c('caseid','AgeInYears','Gender','Race','Ethnicity')]
-data_demographics = rename(data_demographics, CaseID = caseid)
-data_injuryclassification = data_injuryclassification[c('CaseID','CSFractures')]
+data_demographics = data_demographics[c('studysubjectid','controltype','AgeInYears','Gender','Race','Ethnicity')]
+data_demographics = rename(data_demographics, StudySubjectID = studysubjectid)
+data_injuryclassification = data_injuryclassification[c('StudySubjectID', 'CSFractures')]
+data_injuryclassification = mutate(data_injuryclassification, CSFractures = as.integer(CSFractures=="Y"))
 
-data_case = merge(data_analysisvariables, data_injuryclassification, by="CaseID")
-data_demo = merge(data_case, data_demographics, by="CaseID")
+data = mutate(data_analysisvariables, CSI = as.integer(ControlType == 'case'))
+data = select(data, -c(CaseID, StudySubjectID))
+data_case = merge(data_analysisvariables, data_injuryclassification, by="StudySubjectID")
+data_demo = merge(data_case, data_demographics, by="StudySubjectID")
 
 # split data into validation and test/train sets
-data_validation = filter(data_case, SITE %in% c(7,15,16))
+data_test = filter(data, SITE %in% c(7,15,16))
+data_model = filter(data, !SITE %in% c(7,15,16))
 data_eda = filter(data_case, !SITE %in% c(7,15,16))
 
-data_validation_demo = filter(data_demo, SITE %in% c(7,15,16))
+data_test_demo = filter(data, SITE %in% c(7,15,16))
 data_eda_demo = filter(data_demo, !SITE %in% c(7,15,16))
 
 
 
+```
+```{r statistic-functions}
+model_sensitivity <- function(TP, FN) {
+  return (TP / (TP + FN))
+}
+model_specificity <- function(TN, FP) {
+  return (TN / (TN + FP))
+}
+
+```
+
+
+
+```{r Model-Decision-Tree-Ran}
+library(tree)
+data_model = filter(data, !SITE %in% c(7,15,16))
+data_model = filter(data_model, ControlType %in% c("case", "ran"))
+
+set.seed(1)
+train_index=sample(1:nrow(data_model), 0.8*nrow(data_model))
+train_weights = c()
+for (i in 1:nrow(data_model)) {
+  if (data_model[i, 35]==1) {
+    train_weights = c(train_weights, 5)
+    } else {
+    train_weights = c(train_weights, 1)
+  }
+}
+
+
+tree.data_model = tree(as.factor(CSI)~.-SITE, data=data_model, weights=data_model$CSI*10+1, subset=train_index)
+plot(tree.data_model)
+text(tree.data_model, pretty=0)
+tree.pred = predict(tree.data_model, data_model[-train_index,], type="class")
+results = with(data_model[-train_index,], table(tree.pred, CSI))
+model_sensitivity(results[2, 2], results[1, 2])
+model_specificity(results[1, 1], results[2, 1])
+
+cv.data_model = cv.tree(tree.data_model, FUN = prune.misclass)
+prune.data_model = prune.misclass(tree.data_model, best = 2)
+plot(prune.data_model)
+text(prune.data_model, pretty=0)
+tree.pred = predict(prune.data_model, data_model[-train,], type="class")
+results = with(data_model[-train,], table(tree.pred, CSI))
+model_sensitivity(results[2, 2], results[1, 2])
+model_specificity(results[1, 1], results[2, 1])
+```
+```{r Model-Decision-Tree-MOI}
+library(tree)
+data_model = filter(data, !SITE %in% c(7,15,16))
+data_model = filter(data_model, ControlType %in% c("case", "moi"))
+
+set.seed(1)
+train_index=sample(1:nrow(data_model), 0.8*nrow(data_model))
+train_weights = c()
+for (i in 1:nrow(data_model)) {
+  if (data_model[i, 35]==1) {
+    train_weights = c(train_weights, 5)
+    } else {
+    train_weights = c(train_weights, 1)
+  }
+}
+
+
+tree.data_model = tree(as.factor(CSI)~.-SITE, data=data_model, weights=data_model$CSI*12+1, subset=train_index)
+plot(tree.data_model)
+text(tree.data_model, pretty=0)
+tree.pred = predict(tree.data_model, data_model[-train_index,], type="class")
+results = with(data_model[-train_index,], table(tree.pred, CSI))
+model_sensitivity(results[2, 2], results[1, 2])
+model_specificity(results[1, 1], results[2, 1])
+
+cv.data_model = cv.tree(tree.data_model, FUN = prune.misclass)
+prune.data_model = prune.misclass(tree.data_model, best = 2)
+plot(prune.data_model)
+text(prune.data_model, pretty=0)
+tree.pred = predict(prune.data_model, data_model[-train,], type="class")
+results = with(data_model[-train,], table(tree.pred, CSI))
+model_sensitivity(results[2, 2], results[1, 2])
+model_specificity(results[1, 1], results[2, 1])
+```
+```{r Model-Decision-Tree-All}
+library(tree)
+data_model = filter(data, !SITE %in% c(7,15,16))
+# data_model = filter(data_model, ControlType %in% c("case", "ran"))
+
+set.seed(1)
+train_index=sample(1:nrow(data_model), 0.8*nrow(data_model))
+train_weights = c()
+for (i in 1:nrow(data_model)) {
+  if (data_model[i, 35]==1) {
+    train_weights = c(train_weights, 5)
+    } else {
+    train_weights = c(train_weights, 1)
+  }
+}
+
+
+tree.data_model = tree(as.factor(CSI)~.-SITE, data=data_model, weights=data_model$CSI*22+1, subset=train_index)
+plot(tree.data_model)
+text(tree.data_model, pretty=0)
+tree.pred = predict(tree.data_model, data_model[-train_index,], type="class")
+results = with(data_model[-train_index,], table(tree.pred, CSI))
+model_sensitivity(results[2, 2], results[1, 2])
+model_specificity(results[1, 1], results[2, 1])
+
+cv.data_model = cv.tree(tree.data_model, FUN = prune.misclass)
+prune.data_model = prune.misclass(tree.data_model, best = 2)
+plot(prune.data_model)
+text(prune.data_model, pretty=0)
+tree.pred = predict(prune.data_model, data_model[-train,], type="class")
+results = with(data_model[-train,], table(tree.pred, CSI))
+model_sensitivity(results[2, 2], results[1, 2])
+model_specificity(results[1, 1], results[2, 1])
+(results[2, 2]+results[1, 1])/nrow(data_model)
+
+tree.pred = predict(prune.data_model, data_test, type="class")
+results = with(data_test, table(tree.pred, CSI))
+model_sensitivity(results[2, 2], results[1, 2])
+model_specificity(results[1, 1], results[2, 1])
+(results[2, 2]+results[1, 1])/nrow(data_test)
+```
+```{r Model-Decision-Tree-Sens-Spec}
+library(tree)
+data_model = filter(data, !SITE %in% c(7,15,16))
+# data_model = filter(data_model, ControlType %in% c("case", "ran"))
+
+set.seed(1)
+train_index=sample(1:nrow(data_model), 0.8*nrow(data_model))
+
+sens = c()
+spec = c()
+for (i in 0:100) {
+  tree.data_model = tree(as.factor(CSI)~.-SITE, data=data_model, weights=data_model$CSI*i+1, subset=train_index)
+  tree.pred = predict(tree.data_model, data_model[-train_index,], type="class")
+  results = with(data_model[-train_index,], table(tree.pred, CSI))
+  
+  cv.data_model = cv.tree(tree.data_model, FUN = prune.misclass)
+  prune.data_model = prune.misclass(tree.data_model, best = 2)
+  tree.pred = predict(prune.data_model, data_model[-train,], type="class")
+  results = with(data_model[-train,], table(tree.pred, CSI))
+  (results[2, 2]+results[1, 1])/nrow(data_model)
+  
+  tree.pred = predict(prune.data_model, data_test, type="class")
+  results = with(data_test, table(tree.pred, CSI))
+  sens = c(sens, model_sensitivity(results[2, 2], results[1, 2]))
+  spec = c(spec, model_specificity(results[1, 1], results[2, 1]))
+
+}
+
+plot(spec, sens, type = "b", pch = 19, 
+     col = "red", xlab = "specificity", ylab = "sensitivity")
+lines(0:0.1:1,rep(0.98, length(0:0.1:1)))
 ```
 
 ```{r EDA-Num-NA}
@@ -76,7 +233,7 @@ fig2 = barplot(na_count_sort[1:10], main = "Number of Missing Entries",
 
 
 ```
-```{r EDA-NA-Freq}
+```{r EDA-NA-Frac}
 data_eda_complete = data_eda[complete.cases(data_eda),]
 data_eda_incomplete = data_eda[-complete.cases(data_eda),]
 
@@ -96,7 +253,7 @@ ggplot(data_fracture_rate) +
     ggtitle('Fracture Rate, Varying Entry Completeness') + ylab("Fracture Rate") + xlab("Entry Completeness")
 ```
 
-```{r more-EDA}
+```{r EDA-Corr}
 data_eda_complete = data_eda[complete.cases(data_eda),]
 
 
@@ -107,8 +264,54 @@ data_cor <- cor(data_cor_var, data_cor_res)
 data_cor = abs(data_cor)
 data_cor = data_cor[order(data_cor[,1], decreasing = T),]
 fig3 = barplot(data_cor[1:10], main = "Absolute Correlation with CSFracture", 
-               ylab = '|Corr|', las = 2)
+               ylab = '|Corr|', las = 2, cex.names = 0.5)
 ```
+```{r EDA-Demo-Control}
+counts_race <- table(data_demographics$controltype, data_demographics$Race)
+groupby_case <- rowSums(counts_race)
+freq_race <- counts_race/groupby_case
+
+barplot(freq_race, main="Patient Distribution by Control Type and Race",
+  xlab="Race", ylab='Frequency', legend = rownames(freq_race), beside=TRUE, 
+  args.legend = list(x = "topleft", title = 'Control Type', inset = c(0.01,0)))
+
+```
+```{r EDA-Demo-Gender}
+# observe CSF and counts of patients by age and gender
+data_eda_demo$AgeInYears <- round(data_eda_demo$AgeInYears)
+
+# group by age and gender, get ciTBI rates and counts
+CSI_demographics <- data_eda_demo %>% group_by(Gender, AgeInYears) %>%
+  summarize(CSI_rate = mean(CSFractures), n=n()) %>%
+  ungroup
+# change numbers into human-readable labels
+# CSI_demographics <- CSI_demographics %>% 
+#                       mutate(Gender=recode(Gender, `1`="Male",`2`="Female"))
+# plot rates by demographics
+plot_demographics_CSI <- ggplot(CSI_demographics, 
+                                  mapping = aes(x = AgeInYears, y = Gender)) +
+                                  geom_tile(mapping = aes(fill = CSI_rate))+
+                            scale_fill_gradientn(
+                                  colors = hcl.colors(20, "RdYlGn"), 
+                                  trans = 'reverse')+
+                            ggtitle("CSI Rate by Age and Gender")+
+                            xlab("Age (Years)")+      
+                            guides(fill=guide_legend(title="CSI Rate"))
+# change numbers into human-readable labels
+# data_gender_str <- data %>% mutate(Gender=recode(Gender, `1`="Male",`2`="Female"))
+# plot counts by demographics
+plot_demographics_count <- ggplot(data = data_eda_demo) + 
+                            geom_count(mapping = aes(x = AgeInYears, y = Gender))+
+                            ggtitle("Count of Patients by Age and Gender (Case Group)")+
+                            xlab("Age (Years)")+
+                            guides(fill=guide_legend(title="Count"))
+# aggregate plots
+plot_age_gender<- ggarrange(plot_demographics_CSI, plot_demographics_count,
+                           ncol = 1, nrow = 2)
+plot_age_gender
+
+```
+
 
 
 
