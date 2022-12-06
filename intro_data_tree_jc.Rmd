@@ -64,6 +64,28 @@ neurosurgeon[CITATION]. The remaining 2,774 controls fall into three control
 groups: 1,060 unmatched random controls, 1,012 mechanism-of-injury and age 
 matched controls, and 702 age-matched EMS controls. 
 
+```{r}
+av <- read.csv("./CSpine/CSV datasets/analysisvariables.csv")
+radiology <- read.csv("./CSpine/CSV datasets/radiologyreview.csv")
+injury <- read.csv("./CSpine/CSV datasets/injuryclassification.csv")
+site <- read.csv("./CSpine/CSV datasets/clinicalpresentationsite.csv")
+ems <- read.csv("./CSpine/CSV datasets/clinicalpresentationfield.csv")
+outside <- read.csv("./CSpine/CSV datasets/clinicalpresentationoutside.csv")
+dem <- read.csv("./CSpine/CSV datasets/demographics.csv")
+
+names(dem)[names(dem) == "studysubjectid"] <- "StudySubjectID"
+av_dem <- merge(av, dem, by="StudySubjectID")
+
+plot_demographics_count <- ggplot(data = av_dem) + 
+                            geom_count(mapping = aes(x = SITE, y = Race))+
+                            ggtitle("Count of Patients by Site and Race")+
+                            xlab("Site")+
+                            guides(fill=guide_legend(title="Count"))+
+                            scale_x_continuous(breaks=seq(1,17,1))
+plot_demographics_count
+```
+
+
 Leonard et al. 8 major variables that are associated with CSI: altered mental 
 status, focal neurological deficits, complaint of neck pain, torticollis,
 substantial injury to the torso, predisposing condition, high-risk motor vehicle

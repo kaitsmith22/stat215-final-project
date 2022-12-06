@@ -60,7 +60,7 @@ data_eda = filter(data_case, !SITE %in% c(7,15,16))
 data_test_demo = filter(data, SITE %in% c(7,15,16))
 data_eda_demo = filter(data_demo, !SITE %in% c(7,15,16))
 
-
+data_eda_demo_full = merge(mutate(data_analysisvariables, CSI = as.integer(ControlType == 'case')), data_demographics, by="StudySubjectID")
 
 ```
 ```{r statistic-functions}
@@ -312,6 +312,41 @@ plot_age_gender
 
 ```
 
+```{r EDA-SITE-RACE}
+# observe CSF and counts of patients by age and gender
+data_eda_demo_full$AgeInYears <- round(data_eda_demo_full$AgeInYears)
 
+# group by age and gender, get ciTBI rates and counts
+CSI_demographics <- data_eda_demo_full %>% group_by(Race, SITE) %>%
+  summarize(n=n()) %>%
+  ungroup
+# change numbers into human-readable labels
+# CSI_demographics <- CSI_demographics %>% 
+#                       mutate(Gender=recode(Gender, `1`="Male",`2`="Female"))
+# plot rates by demographics
+plot_demographics_freq <- ggplot(CSI_demographics, 
+                                  mapping = aes(x = SITE, y = Race)) +
+                                  geom_tile(mapping = aes(fill = n))+
+                            scale_fill_gradientn(
+                                  colors = hcl.colors(20, "RdYlGn"), 
+                                  trans = 'reverse')+
+                            ggtitle("CSI Rate by Age and Gender")+
+                            xlab("Age (Years)")+      
+                            guides(fill=guide_legend(title="CSI Rate"))
+# change numbers into human-readable labels
+# data_gender_str <- data %>% mutate(Gender=recode(Gender, `1`="Male",`2`="Female"))
+# plot counts by demographics
+plot_demographics_count <- ggplot(data = data_eda_demo_full) + 
+                            geom_count(mapping = aes(x = SITE, y = Race))+
+                            ggtitle("Count of Patients by Site and Race")+
+                            xlab("Site")+
+                            guides(fill=guide_legend(title="Count"))+
+                            scale_x_continuous(breaks=seq(1,17,1))
+# aggregate plots
+plot_age_gender<- ggarrange(plot_demographics_freq, plot_demographics_count,
+                           ncol = 1, nrow = 2)
+plot_demographics_count
+
+```
 
 
