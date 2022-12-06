@@ -148,6 +148,6 @@ for (i in 1:n_bootstraps){
 }
 names(selected_names_freq) <- selected_names
 
-barplot(selected_names_freq)
+barplot(selected_names_freq, las = 2)
 ```
 
