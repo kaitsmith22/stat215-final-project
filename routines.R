@@ -14,7 +14,7 @@ metrics <- function(truth, classPreds){
 
 rocs <- function(truth, numPreds, classPreds, baseline1, baseline2){
   library(pROC)
-  roc(as.numeric(truth), numPreds, plot=T, lty=1, lwd=2)
+  r <- roc(as.numeric(truth), numPreds, plot=T, lty=1, lwd=2)
   
   m <- metrics(truth, classPreds)
   points(m[2,1], m[1,1], pch=16)
@@ -27,6 +27,7 @@ rocs <- function(truth, numPreds, classPreds, baseline1, baseline2){
   points(m[2,1], m[1,1], pch=18)
   
   grid()
+  return(r$auc)
 }
 
 rocs2 <- function(truth, numPreds, classPreds, baseline1, baseline2){
