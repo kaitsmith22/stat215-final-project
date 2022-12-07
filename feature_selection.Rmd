@@ -54,9 +54,8 @@ forward <- function(vals, df){
       
     }
 
-
     
-    if (min(init.p.vals) < 0.15){
+    if (min(init.p.vals) < 0.05){
       # add coefficient with smallest p-value:
       coeffs <- paste(paste(coeffs, "+"), vals[which(init.p.vals == min(init.p.vals))])
       coeffs_list <- append(coeffs_list, vals[which(init.p.vals == min(init.p.vals))])
