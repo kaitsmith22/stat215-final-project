@@ -7,7 +7,7 @@ metrics <- function(truth, classPreds){
   specificity <- DescTools::BinomCI((tn), n = sum(!truth), method = "wald", conf.level = 0.95)
   
   df <- rbind(sensitivity, specificity)
-  colnames(df) <- c("Estimage", "Lower CI Bound", "Upper CI Bound")
+  colnames(df) <- c("Estimate", "Lower CI Bound", "Upper CI Bound")
   rownames(df) <- c("Sensitivity", "Specificity")
   return(df)
 }
@@ -22,9 +22,9 @@ rocs <- function(truth, numPreds, classPreds, baseline1, baseline2, print_metric
   abline(h=m[1,1], lty=2)
   
   if(print_metrics){
-    text(.6, .6, paste("ROC AUC=", round(r$auc,3)), cex =.8)
-    text(m[2,1]-0.05, 0.02, paste("Specificity=", round(m[2,1],3)), cex =.8)
-    text(0.85, m[1,1]-.03, paste("Sensitivity=", round(m[1,1],3)), cex =.8)
+    text(.6, .6, paste("ROC AUC=", round(r$auc,3)), cex =.6)
+    text(m[2,1]-0.05, 0.02, paste("Specificity=", round(m[2,1],3)), cex =.6)
+    text(0.85, m[1,1]-.03, paste("Sensitivity=", round(m[1,1],3)), cex =.6)
   }
   
   m <- metrics(truth, baseline1)
