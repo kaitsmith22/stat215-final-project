@@ -12,7 +12,7 @@ metrics <- function(truth, classPreds){
   return(df)
 }
 
-rocs <- function(truth, numPreds, classPreds, baseline1, baseline2){
+rocs <- function(truth, numPreds, classPreds, baseline1, baseline2, print_metrics=T){
   library(pROC)
   r <- roc(as.numeric(truth), numPreds, plot=T, lty=1, lwd=2)
   
@@ -20,6 +20,12 @@ rocs <- function(truth, numPreds, classPreds, baseline1, baseline2){
   points(m[2,1], m[1,1], pch=16)
   abline(v=m[2,1], lty=2)
   abline(h=m[1,1], lty=2)
+  
+  if(print_metrics){
+    text(.6, .6, paste("ROC AUC=", round(r$auc,3)), cex =.8)
+    text(m[2,1]-0.05, 0.02, paste("Specificity=", round(m[2,1],3)), cex =.8)
+    text(0.85, m[1,1]-.03, paste("Sensitivity=", round(m[1,1],3)), cex =.8)
+  }
   
   m <- metrics(truth, baseline1)
   points(m[2,1], m[1,1], pch=18)
