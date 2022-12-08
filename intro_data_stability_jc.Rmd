@@ -121,10 +121,12 @@ during training.
 The effect of varying the elasticnet mixing parameter, or the mixture of the 
 L1 lasso penalty and L2 ridge penalty, was analyzed. The top 15 variables 
 selected by the specific mixing parameter were then used to perform logistic 
-regression.
+regression. To compare the models, the area under the ROC curves (AUC) were 
+calculated.
 
 ```{r glmnet-alpha}
 library(glmnet)
+library(pROC)
 av <- read.csv("./CSpine/CSV datasets/analysisvariables.csv")
 
 vars <- colnames(av)[5:ncol(av)]
@@ -164,6 +166,8 @@ sens = c()
 spec_low = c()
 spec_high = c()
 spec = c()
+
+auc_list = c()
 for (j in alpha_range){
   X <- dat_no_na[, vars]
   # find value of lambda that minimizes the deviance
@@ -222,33 +226,43 @@ for (j in alpha_range){
   spec_low = c(spec_low, results[2,2])
   spec_high = c(spec_high, results[2,3])
   
-
+  # rocs(dat_no_na$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
+  auc_list <- c(auc_list, auc(roc(as.numeric(dat_no_na$ControlType == "case"), num_preds, plot=F, lty=1, lwd=2)))
+  
   
 }
-CI_bootstrap_sens <-round(data.frame(x = alpha_range,
-                                     sens = sens,
-                                     sens_low = sens_low,
-                                     sens_high = sens_high), 4)
-  
-# Creating scatter plot with its
-# confindence intervals
-ggplot(CI_bootstrap_sens, aes(x, sens)) + geom_point() + 
-geom_errorbar(aes(ymin = sens_low, ymax = sens_high))+ xlab('Lasso-Ridge Mixing Parameter') + 
-ylab('Sensitivity Estimate') + ggtitle('Sensitivity Estimates Across Varying Mixing Parameters')
+alpha_auc_df <- data.frame(x = alpha_range,
+                                     y = auc_list)
 
-CI_bootstrap_spec <-round(data.frame(x = alpha_range,
-                                     spec = spec,
-                                     spec_low = spec_low,
-                                     spec_high = spec_high), 4)
-  
-# Creating scatter plot with its
-# confindence intervals
-ggplot(CI_bootstrap_spec, aes(x, spec)) + geom_point() + 
-geom_errorbar(aes(ymin = spec_low, ymax = spec_high)) + xlab('Lasso-Ridge Mixing Parameter') +
-ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Varying Mixing Parameters')
+ggplot(alpha_auc_df, aes(x, y)) + geom_point() + 
+  xlab('Lasso-Ridge Mixing Parameter') + 
+ylab('AUC') + ggtitle('Area under ROC Curve Across Varying Mixing Parameters') 
+# CI_bootstrap_sens <-round(data.frame(x = alpha_range,
+#                                      sens = sens,
+#                                      sens_low = sens_low,
+#                                      sens_high = sens_high), 4)
+#   
+# # Creating scatter plot with its
+# # confindence intervals
+# ggplot(CI_bootstrap_sens, aes(x, sens)) + geom_point() + 
+# geom_errorbar(aes(ymin = sens_low, ymax = sens_high))+ xlab('Lasso-Ridge Mixing Parameter') + 
+# ylab('Sensitivity Estimate') + ggtitle('Area under ROC Curve Across Varying Mixing Parameters')
+# 
+# CI_bootstrap_spec <-round(data.frame(x = alpha_range,
+#                                      spec = spec,
+#                                      spec_low = spec_low,
+#                                      spec_high = spec_high), 4)
+#   
+# # Creating scatter plot with its
+# # confindence intervals
+# ggplot(CI_bootstrap_spec, aes(x, spec)) + geom_point() + 
+# geom_errorbar(aes(ymin = spec_low, ymax = spec_high)) + xlab('Lasso-Ridge Mixing Parameter') +
+# ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Varying Mixing Parameters')
 
 ```
-
+The nonzero $\alpha$ parameters yield similar confidence intervals for both 
+sensitivity and specificity, but the pure ridge regression $\alpha$ yields 
+significantly worse performance.
 
 As for introducing a perturbation to logistic regression classification, one can 
 adjust the classification threshold. The effect of this is captured in the ROC 
