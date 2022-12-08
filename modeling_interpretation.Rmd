@@ -302,13 +302,13 @@ r <- rocs(avnn$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn
 Again, the logistic regression produced an ROC curve that was strictly dominant to the published decision rule (according to our CV) with AUC = 0.81. A choice of a suitable decision threshold produced the following sensitivity/specificity metrics:
 
 ```{r, echo=FALSE}
-metrics(avnn$ControlType == "case", class_preds)
+knitr::kable(metrics(avnn$ControlType == "case", class_preds))
 ```
 
 The list of predictors used for the logistic regression model is:
 
 ```{r, echo=FALSE}
-lm.1$coefficients
+knitr::kable(lm.1$coefficients, col.names =c("Parameter Estimate"))
 ```
 
 In addition to these two approaches we have experimented with neural networks and gradient boosting (on stubs and trees). Both approaches yielded results that were not much better than the approaches we presented here, and produced models that were more difficult to interpret, so we chose to omit them from this report.
