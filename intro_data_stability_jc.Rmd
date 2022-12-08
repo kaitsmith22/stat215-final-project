@@ -21,8 +21,6 @@ library(RColorBrewer)
 library(ggpubr)
 library("reshape")
 library(formatR)
-library(flextable)
-# library(huxtable)
 # R.utils::sourceDirectory("./R/", modifiedOnly = F, recursive = F) # useful functions
 
 source("./routines.R")
@@ -80,7 +78,7 @@ dem <- read.csv("./CSpine/CSV datasets/demographics.csv")
 names(dem)[names(dem) == "studysubjectid"] <- "StudySubjectID"
 av_dem <- merge(av, dem, by="StudySubjectID")
 
-plot_demographics_count <- ggplot(data = av_dem[av_dem$Race != "PI" & av_dem$Race != "AI",]) + 
+plot_demographics_count <- ggplot(data = av_dem) + 
                             geom_count(mapping = aes(x = SITE, y = Race))+
                             ggtitle("Count of Patients by Site and Race")+
                             xlab("Site")+
@@ -121,16 +119,14 @@ during training.
 
 ## Model Perturbation
 The effect of varying the elasticnet mixing parameter, or the mixture of the 
-L1 lasso penalty and L2 ridge penalty, was analyzed. The mixing parameter, 
-alpha, is used in the penalty as
-
-$$(1-\alpha)/2 ||\beta||_2^2 + \alpha||\beta||_1$$
-such that $\alpha = 1$ is the lasso penalty and $\alpha = 0$ is the ridge 
-penalty. The top 15 variables selected by the specific mixing parameter were 
-then used to perform logistic regression.
+L1 lasso penalty and L2 ridge penalty, was analyzed. The top 15 variables 
+selected by the specific mixing parameter were then used to perform logistic 
+regression. To compare the models, the area under the ROC curves (AUC) were 
+calculated.
 
 ```{r glmnet-alpha}
 library(glmnet)
+library(pROC)
 av <- read.csv("./CSpine/CSV datasets/analysisvariables.csv")
 
 vars <- colnames(av)[5:ncol(av)]
@@ -170,6 +166,8 @@ sens = c()
 spec_low = c()
 spec_high = c()
 spec = c()
+
+auc_list = c()
 for (j in alpha_range){
   X <- dat_no_na[, vars]
   # find value of lambda that minimizes the deviance
@@ -228,35 +226,43 @@ for (j in alpha_range){
   spec_low = c(spec_low, results[2,2])
   spec_high = c(spec_high, results[2,3])
   
-
+  # rocs(dat_no_na$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
+  auc_list <- c(auc_list, auc(roc(as.numeric(dat_no_na$ControlType == "case"), num_preds, plot=F, lty=1, lwd=2)))
+  
   
 }
-CI_bootstrap_sens <-round(data.frame(x = alpha_range,
-                                     sens = sens,
-                                     sens_low = sens_low,
-                                     sens_high = sens_high), 4)
-  
-# Creating scatter plot with its
-# confindence intervals
-ggplot(CI_bootstrap_sens, aes(x, sens)) + geom_point() + 
-geom_errorbar(aes(ymin = sens_low, ymax = sens_high))+ xlab('Lasso-Ridge Mixing Parameter') + 
-ylab('Sensitivity Estimate') + ggtitle('Sensitivity Estimates Across Varying Mixing Parameters')
+alpha_auc_df <- data.frame(x = alpha_range,
+                                     y = auc_list)
 
-CI_bootstrap_spec <-round(data.frame(x = alpha_range,
-                                     spec = spec,
-                                     spec_low = spec_low,
-                                     spec_high = spec_high), 4)
-  
-# Creating scatter plot with its
-# confindence intervals
-ggplot(CI_bootstrap_spec, aes(x, spec)) + geom_point() + 
-geom_errorbar(aes(ymin = spec_low, ymax = spec_high)) + xlab('Lasso-Ridge Mixing Parameter') +
-ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Varying Mixing Parameters')
+ggplot(alpha_auc_df, aes(x, y)) + geom_point() + 
+  xlab('Lasso-Ridge Mixing Parameter') + 
+ylab('AUC') + ggtitle('Area under ROC Curve Across Varying Mixing Parameters') 
+# CI_bootstrap_sens <-round(data.frame(x = alpha_range,
+#                                      sens = sens,
+#                                      sens_low = sens_low,
+#                                      sens_high = sens_high), 4)
+#   
+# # Creating scatter plot with its
+# # confindence intervals
+# ggplot(CI_bootstrap_sens, aes(x, sens)) + geom_point() + 
+# geom_errorbar(aes(ymin = sens_low, ymax = sens_high))+ xlab('Lasso-Ridge Mixing Parameter') + 
+# ylab('Sensitivity Estimate') + ggtitle('Area under ROC Curve Across Varying Mixing Parameters')
+# 
+# CI_bootstrap_spec <-round(data.frame(x = alpha_range,
+#                                      spec = spec,
+#                                      spec_low = spec_low,
+#                                      spec_high = spec_high), 4)
+#   
+# # Creating scatter plot with its
+# # confindence intervals
+# ggplot(CI_bootstrap_spec, aes(x, spec)) + geom_point() + 
+# geom_errorbar(aes(ymin = spec_low, ymax = spec_high)) + xlab('Lasso-Ridge Mixing Parameter') +
+# ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Varying Mixing Parameters')
 
 ```
 The nonzero $\alpha$ parameters yield similar confidence intervals for both 
-sensitivity and specificity, but the pure ridge regression $alpha$ yields lower 
-sensitivity (as expected?).
+sensitivity and specificity, but the pure ridge regression $\alpha$ yields 
+significantly worse performance.
 
 As for introducing a perturbation to logistic regression classification, one can 
 adjust the classification threshold. The effect of this is captured in the ROC 
@@ -298,7 +304,6 @@ for (i in unique(avnn$SITE)){
                 axialloadtop + Torticollis2 + LOC + HighriskOtherMV + Clotheslining + 
                 subinj_Face2 + AxialLoadAnyDoc, 
             data = train, family = "binomial")
-  num_preds[avnn$SITE==i] <-  predict(lm.1, type = "response", newdata=test)
 }
 class_preds <- as.numeric(num_preds > 0.079)
 
@@ -327,42 +332,9 @@ num_preds <-  predict(lm.1, type = "response", newdata=av7n)
 class_preds <- as.numeric(num_preds > 0.079)
 # rocs(av7n$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
 site7_metrics <- metrics(av7n$ControlType == "case", class_preds)
-
-df <- data.frame(c(base_metrics[1,1], site7_metrics[1,1]), 
-                 c(base_metrics[1,2], site7_metrics[1,2]), 
-                 c(base_metrics[1,3], site7_metrics[1,3]))
-colnames(df) <- c("Estimate", "Lower CI Bound", "Upper CI Bound")
-rownames(df) <- c("Orig. Training Data", "Site 7 Data")
-df <- df %>% rownames_to_column(" ")
-
-ft <- flextable(df) %>% 
-  autofit() %>%
-  line_spacing(space = .5, part = "all") %>% 
-  padding(padding = 1, part = "header") 
-
-ft <- set_caption(ft, "Sensitivity Confidence Intervals")
-
-ft
-
-df <- data.frame(c(base_metrics[2,1], site7_metrics[2,1]), 
-                 c(base_metrics[2,2], site7_metrics[2,2]), 
-                 c(base_metrics[2,3], site7_metrics[2,3]))
-colnames(df) <- c("Estimate", "Lower CI Bound", "Upper CI Bound")
-rownames(df) <- c("Orig. Training Data", "Site 7 Data")
-df <- df %>% rownames_to_column(" ")
-
-ft <- flextable(df) %>% 
-  autofit() %>%
-  line_spacing(space = .5, part = "all") %>% 
-  padding(padding = 1, part = "header") 
-
-ft <- set_caption(ft, "Specificity Confidence Intervals")
-
-ft
 ```
-As expected, slightly worse performance is observed, as the records from site 7 
-were excluded from training. In addition, the confidence interval is wider due 
-to the reduced size of the test set.
+As expected, worse performance is observed, as the records from site 7 were 
+excluded from training. 
 
 ### Stability under Subsampling
 The model was evaluated on just the positive injury records and the EMS control 
@@ -384,43 +356,9 @@ num_preds <-  predict(lm.1, type = "response", newdata=avnn_ce)
 class_preds <- as.numeric(num_preds > 0.079)
 # rocs(avnn_ce$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
 subsample_metrics <- metrics(avn_ce$ControlType == "case", class_preds)
-
-df <- data.frame(c(base_metrics[1,1], subsample_metrics[1,1]), 
-                 c(base_metrics[1,2], subsample_metrics[1,2]), 
-                 c(base_metrics[1,3], subsample_metrics[1,3]))
-colnames(df) <- c("Estimate", "Lower CI Bound", "Upper CI Bound")
-rownames(df) <- c("Orig. Training Data", "Case and EMS Data")
-df <- df %>% rownames_to_column(" ")
-
-ft <- flextable(df) %>% 
-  autofit() %>%
-  line_spacing(space = .5, part = "all") %>% 
-  padding(padding = 1, part = "header") 
-
-ft <- set_caption(ft, "Sensitivity Confidence Intervals")
-
-ft
-
-df <- data.frame(c(base_metrics[2,1], subsample_metrics[2,1]), 
-                 c(base_metrics[2,2], subsample_metrics[2,2]), 
-                 c(base_metrics[2,3], subsample_metrics[2,3]))
-colnames(df) <- c("Estimate", "Lower CI Bound", "Upper CI Bound")
-rownames(df) <- c("Orig. Training Data", "Case and EMS Data")
-df <- df %>% rownames_to_column(" ")
-
-ft <- flextable(df) %>% 
-  autofit() %>%
-  line_spacing(space = .5, part = "all") %>% 
-  padding(padding = 1, part = "header") 
-
-ft <- set_caption(ft, "Specificity Confidence Intervals")
-
-ft
 ```
 
-The model performs significantly worse in terms of sensitivity when the
-subsetted data is applied to it, although this difference is likely due to
-the difference in class distribution. 
+
 
 ### Stability under Bootstrapping
 In addition, we observed the stability our model under bootstraps. For the lasso 
