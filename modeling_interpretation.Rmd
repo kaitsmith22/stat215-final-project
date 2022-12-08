@@ -1,13 +1,38 @@
 ---
 title: "Modeling Section"
 date: "12/5/2022"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE, echo=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(tidyverse)
+library(glmnet)
+library(tidyverse)
+library(forcats)
+library(lubridate)
+library(stringr)
+library(RColorBrewer)
+library(ggpubr)
+library("reshape")
+library(flextable)
+library(huxtable)
+library(formatR)
+library(glmnet)
+library(gridExtra)
+
+knitr::opts_chunk$set(
+  echo = FALSE,  # don't print the code chunk
+  warning = FALSE,  # don't print warnings
+  message = FALSE,  # don't print messages
+  fig.width = 5,  # set default width of figures
+  fig.height = 3,  # set default height of figures
+  fig.align = "center",  # always align figure in center
+  fig.pos = "H",  # always plot figure at the exact location of the code chunk
+  cache = FALSE)  # don't cache results
 
 source("./routines.R")
 ```
@@ -28,7 +53,43 @@ outside <- read.csv("./CSpine/CSV datasets/clinicalpresentationoutside.csv")
 
 ## Replicate Research Findings
 
+First, we implemented the clinical decision rule found in Leonard et al. This
+study determined a clinical decision rule by selecting features using forward selection 
+with logistic regression. For each iteration, the algorithm would add the feature whose p-value from 
+the Chi-squared statistic was smallest when that feature is added to the model, versus when any other
+ feature was added. The algorithm stopped adding features when no additional feature 
+ resulted in a p-value less than 0.05. 1000 samples were bootstrapped and a new logistic regression model was computed each time. A covariate was included in the final model if it appeared in over 50% of the bootstrapped models. This process 
+was repeated for each control group: random, EMS, and mechanism of injury controls. 
+The forward selection logistic regression models identified 6 common covariates between these 3 models: altered mental status, focal neurological deficit, complaint of neck
+pain, substantial injury to the torso, high-risk motor vehicle
+crash, and diving. The decision rule then classified
+a patient as likely to have cervical spine injury if any one of these factors was 
+true, otherwise the patient was ruled to not have a cervical spine injury.
 
+Although the report did not specify how missing values 
+are handled, we removed samples where any of the covariates were missing, since 
+our protocol in R was to remove NA values in logistic regression. 
+We calculated this decision rule to have the following metrics, where patients from 
+all 3 controll groups were included:
+
+```{r, fig.caption = "Baseline metrics calculated from Leonard et al."}
+df <- data.frame(c("Sensitivity", "Specificity"), c(0.9064588, 0.4053537), c(0.8795248,  0.3843153), c(0.9333928, 0.4263922))
+colnames(df) <- c("Metric", "Estimate", "Lower CI Bound", "Upper CI Bound")
+
+ft <- flextable(df) %>% 
+  autofit() %>%
+  line_spacing(space = .5, part = "all") %>% 
+  padding(padding = 1, part = "header") 
+
+ft
+
+```
+
+Although the value for sensitivity is 2% lower and the value for specificity is 5%
+higher than presented in the Leonard et al. paper, we were not able to exactly 
+replicate results due to assumptions we had to make about handling missing values, 
+and which control groups to include in the final calculations. However,
+this replication gave us a baseline to compare our own model results to.
 
 ## Modeling Approach
 
@@ -39,7 +100,68 @@ We first outline our feature selection approaches, then present out classificati
 
 ### Bootstrapped Forward Selection
 
+First, we selected features using forward selection with logistic regression,
+similar to the method used by Leonard et al. We started with an empty model,
+and added features sequentially, including the feature with the smallest p-value each.
+However, we stopped when there was no feature 
+with a p-value less than $0.15$, instead of $0.05$ used in the feature selection method by Leonard et al.
+We then proceeded with the 
+same bootstrapping procedure, selecting features that appeared in over 50% of the
+bootstrapped models. 
+
 ### Lasso Logistic Regression (L1 regularization)
+
+Next, we selected features from a Lasoo logistic regression model. First,
+we completed 10 fold cross validation to find the value of $lambda$ that 
+minimizes the $L1$ loss for the training data. We then selected the features from this 
+model that had non-zero regression coefficients. 
+
+In the following graph, you can see the order coefficients are added to the 
+Lasso model, which provide insights into which features are most important
+ to the final probability. 
+
+
+```{r, fig.caption = "Plot of order features are added to the Lasso model, as the L1 Norm increases. For a large L1 Norm, the lasso solution is equivalent to the OLS solution."}
+
+data_train <- av[av$SITE != 15 & av$SITE != 16 & av$SITE != 7,]
+
+y <- unlist(lapply(data_train$ControlType, function(x){
+  if (x == "case")
+    {return (1)} 
+  else 0}))
+
+data_train$y <- y
+
+vars <- colnames(av)[5:ncol(av)]
+
+dat_no_na <- data_train[rowSums(is.na(data_train)) == 0, ]
+
+X <- dat_no_na[, vars]
+
+lasso_model <- glmnet(x = X, y = dat_no_na$y, alpha = 1, standardize = TRUE)
+
+p1 <- plot(lasso_model,label=TRUE, axes = T)
+
+```
+
+
+```{r}
+ord <- lasso_model$beta
+
+sum_0 <- apply(ord, MARGIN = 1, function(r){
+  return(sum(r == 0))
+})
+
+# get features in the order they are added to the model
+sorted_sum <- data.frame(seq(1,16), names(sort(sum_0)[1:16]))
+colnames(sorted_sum) <- c("Order", "Variable")
+
+ft <- flextable(sorted_sum) %>% 
+  autofit() %>%
+  line_spacing(space = .5, part = "all") %>% 
+  padding(padding = 1, part = "header") 
+ft
+```
 
 
 ## Classification Experiments
@@ -175,7 +297,7 @@ for (i in unique(avnn$SITE)){
 class_preds <- as.numeric(num_preds > 0.072)
 
 r <- rocs(avnn$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
-$r$auc
+# $r$auc
 ```
 
 Again, the logistic regression produced an ROC curve that was strictly dominant to the published decision rule (according to our CV) with AUC = 0.81. A choice of a suitable decision threshold produced the following sensitivity/specificity metrics:
@@ -194,6 +316,93 @@ In addition to these two approaches we have experimented with neural networks an
 
 
 ## Interpretation
+
+Our model benefits from the interpretability of logistic regression. When 
+a patient is inferenced using the model, the model gives a probability of 
+that patient having a cervical spine injury. That said, due to the necessity 
+for high sensitivity in the model, we declare any patient with a probability
+of an injury greater than 7.9% as a patient who needs further imaging. 
+It is also possible to view the weights of the features, which demonstrate 
+which features contribute the most to the final probability of injury: 
+
+```{r, fig.caption = "Plot of coefficients of the variables in the logistic regression fit to the training data."}
+
+data_train <- av[av$SITE != 15 & av$SITE != 16 & av$SITE != 7,]
+
+# replace these with weights from final model later
+
+lm.1 <- glm(as.numeric(ControlType == "case")~ AlteredMentalStatus + FocalNeuroFindings + HighriskHitByCar +
+                HighriskMVC + PainNeck2 + Predisposed + SubInj_TorsoTrunk + FocalNeuroFindings2 +
+                axialloadtop + Torticollis2 + LOC + HighriskOtherMV + Clotheslining + 
+                subinj_Face2 + AxialLoadAnyDoc, 
+            data = data_train, family = "binomial")
+
+weights <- data.frame(names(lm.1$coeff[2:length(lm.1$coeff)]),  lm.1$coeff[2:length(lm.1$coeff)]) # remove intercept
+colnames(weights) <- c("Covariate", "Weight")
+
+ggplot(weights, aes(y = Covariate, x = Weight)) + geom_bar(stat="identity", fill = "palegreen3") +
+  labs(title = "Weight of Covariates in Logistic Regression") + theme_bw()
+```
+
+It is important to note that the values of the coefficients in logistic regression
+cannot be interpreted the same way the coefficients in linear regression can be interpreted. 
+An increase in any covariate by 1, does not results in linear change in the output by the 
+value of $B_j$, where $B_j$ is the value of the coefficient for that variable 
+in the model.
+Hence, an increase in any of the covariates by one would then yield 
+an increase in the odds ratio by $exp(B_j)$, where $B_j$ is the weight 
+for that particular covariate. However, coefficients with greater weight 
+still can have a greater effect on the output probability from logistic regression,
+which we will examine below: 
+
+```{r, fig.caption = "Plot of change of probability for each variable in the when the covariate is 1 vs when the covariate is 0."}
+diffs <- rep(0, length(lm.1$coeff[2:length(lm.1$coeff)]))
+
+for (i in 1: length(lm.1$coeff[2:length(lm.1$coeff)])){
+  dummy_x <- rep(0, length(lm.1$coeff[2:length(lm.1$coeff)]))
+
+  df_test <- data.frame(matrix(data = dummy_x, nrow = 1))
+  colnames(df_test) <- names(lm.1$coeff[2:length(lm.1$coeff)])
+  
+  p1 <- predict(lm.1, newdata =df_test, type = "response")
+  
+  dummy_x[i] <- 1
+  df_test <- data.frame(matrix(data = dummy_x, nrow = 1))
+  colnames(df_test) <- names(lm.1$coeff[2:length(lm.1$coeff)])
+  
+  p2 <- predict(lm.1, newdata =df_test, type = "response")
+  
+  diffs[i] <- p2 - p1
+}
+
+out_probs <- data.frame(names(lm.1$coeff[2:length(lm.1$coeff)]),  diffs) # remove intercept
+colnames(out_probs) <- c("Covariate", "Probability")
+
+ggplot(out_probs, aes(y = Covariate, x = Probability)) + geom_bar(stat="identity", fill = "palegreen3") +
+  labs(title = "Effect of Change in Covariate on Outcome", x = "Change in Probability") + theme_bw()
+
+```
+
+In the above plot, we find the difference in the outcome probability of logistic 
+regression when the value of each covariate is changed from 0 to 1, while 
+all other covariates are held at 0. We chose to hold all other covariates 
+at 0 as the mode for each variable is 0. As you can see, the largest coefficients 
+from logistic regression have the largest changes in probability when 
+that particular covariate is present in the patient. 
+
+However, these particular changes in probability are dependent on all of 
+the other covariates being held at 0, so a medical professional could 
+not easily state that a patient being predisposed for a cervical spine injury
+would have a 10% increase in probability of having a cervical spine injury
+versus if they were not predisposed. However, these values do serve to give
+a sense on how certain variables affect the outcome more than others.
+
+
+## Stability with Model Perterbation
+
+ Introduce a perturbation to your final model, and summarize
+the effects of this perturbation on the predictions of your model.
+
 
 
 
