@@ -23,6 +23,8 @@ library(huxtable)
 library(formatR)
 library(glmnet)
 library(gridExtra)
+library(rpart)
+library(rpart.plot)
 
 knitr::opts_chunk$set(
   echo = FALSE,  # don't print the code chunk
@@ -205,7 +207,6 @@ avnn_reprod2 <- as.numeric(avnn$AlteredMentalStatus == 1 | avnn$FocalNeuroFindin
 
 
 ```{r, echo=FALSE}
-library(rpart)
 avnn<- avn %>% drop_na(vars)
 
 num_preds <- rep(0, nrow(avnn))
@@ -235,19 +236,18 @@ r <- rocs(avnn$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn
 As we can see, classification tree prodcues an ROC curve with AUC = 0.78. The curve is strictly above the decision rule replicated from the published decision rule. Further selection of an appropriate decision threshold produces the following sensitivity/specificity metrics:
 
 ```{r, echo=FALSE}
-metrics(avnn$ControlType == "case", class_preds)
+knitr::kable(metrics(avnn$ControlType == "case", class_preds))
 ```
 
 The final list of predictors used for the decision tree is:
 
 ```{r, echo=FALSE}
-tree.1$variable.importance
+knitr::kable(tree.1$frame[tree.1$frame$ncompete==4,1], col.names = c("Used Covariates"))
 ```
 
 And the tree itself can be illustrated as follows:
 
 ```{r, echo=FALSE}
-library(rpart.plot)
 rpart.plot(tree.1)
 ```
 
@@ -259,7 +259,6 @@ Next we present the results from simple logistic regression, performed on a set 
 
 
 ```{r, echo=FALSE}
-
 avnn<- avn %>% drop_na(vars)
 
 num_preds <- rep(0, nrow(avnn))
@@ -326,7 +325,6 @@ It is also possible to view the weights of the features, which demonstrate
 which features contribute the most to the final probability of injury: 
 
 ```{r, fig.caption = "Plot of coefficients of the variables in the logistic regression fit to the training data."}
-
 data_train <- av[av$SITE != 15 & av$SITE != 16 & av$SITE != 7,]
 
 # replace these with weights from final model later
