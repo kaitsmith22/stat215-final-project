@@ -959,7 +959,7 @@ ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Bootstraps'
 The sensitivity estimates appear to be more stable than the specificity 
 estimates, as the sensitivity confidence intervals share more overlap.
 
-
+\newpage
 # Evaluation
 
 ## Three Test Sites
@@ -1269,6 +1269,7 @@ ggarrange(p1, p2)
 # Summary
 By investigating primary source data for cervical spine injury (CSI) in children, we derived and validated a clinical decision rule that aims to guide imaging decisions for children who experienced blunt trauma (e.g., altered mental status, focal neurologic deficits, complaint of neck pain, torticollis). Based on our results and stability check, we believe that our decision rule will (1) provide satisfactory performance when applied to future data and (2) perform better than the baseline case in terms of both specificity and sensitivity.
 
+\newpage
 # Citations 
 
 [1] Leonard, J. C., Browne, L. R., Ahmad, F. A., Schwartz, H., Wallendorf, M., Leonard, J. R., Lerner, E. B., & Kuppermann, N. (2019). Cervical Spine Injury Risk Factors in Children With Blunt Trauma. Pediatrics, 144(1), e20183221. https://doi.org/10.1542/peds.2018-3221
