@@ -62,7 +62,7 @@ Blunt Trauma" by Leonard et al.
 Of the 3,314 records, 540 are deemed positive cervical spine injuries from 
 radiology reports or spine consultation. These positive injury records were 
 verified by the principal investigator of Leonard et al. and by a pediatric 
-neurosurgeon[CITATION]. The remaining 2,774 controls fall into three control 
+neurosurgeon. The remaining 2,774 controls fall into three control 
 groups: 1,060 unmatched random controls, 1,012 mechanism-of-injury and age 
 matched controls, and 702 age-matched EMS controls. 
 
@@ -78,7 +78,7 @@ dem <- read.csv("./CSpine/CSV datasets/demographics.csv")
 names(dem)[names(dem) == "studysubjectid"] <- "StudySubjectID"
 av_dem <- merge(av, dem, by="StudySubjectID")
 
-plot_demographics_count <- ggplot(data = av_dem) + 
+plot_demographics_count <- ggplot(data = av_dem[av_dem$Race != "PI" & av_dem$Race != "AI",]) + 
                             geom_count(mapping = aes(x = SITE, y = Race))+
                             ggtitle("Count of Patients by Site and Race")+
                             xlab("Site")+
@@ -260,9 +260,8 @@ ylab('AUC') + ggtitle('Area under ROC Curve Across Varying Mixing Parameters')
 # ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Varying Mixing Parameters')
 
 ```
-The nonzero $\alpha$ parameters yield similar confidence intervals for both 
-sensitivity and specificity, but the pure ridge regression $\alpha$ yields 
-significantly worse performance.
+The nonzero $\alpha$ parameters yield similar AUC values, but the pure ridge 
+regression $\alpha$ yields significantly worse performance.
 
 As for introducing a perturbation to logistic regression classification, one can 
 adjust the classification threshold. The effect of this is captured in the ROC 
