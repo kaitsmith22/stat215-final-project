@@ -74,11 +74,15 @@ Blunt Trauma" by Leonard et al.
 Of the 3,314 records, 540 are deemed positive cervical spine injuries from 
 radiology reports or spine consultation. These positive injury records were 
 verified by the principal investigator of Leonard et al. and by a pediatric 
+<<<<<<< HEAD
 neurosurgeon[Lenoard et al]. The remaining 2,774 controls fall into three control 
+=======
+neurosurgeon. The remaining 2,774 controls fall into three control 
+>>>>>>> 00e9311c9587e6f867b345a84ef570445a372ba2
 groups: 1,060 unmatched random controls, 1,012 mechanism-of-injury and age 
 matched controls, and 702 age-matched EMS controls. 
 
-```{r EDA-Race, echo=FALSE}
+```{r EDA-Race, echo=FALSE, fig.width=5,fig.height=2}
 av <- read.csv("./CSpine/CSV datasets/analysisvariables.csv")
 radiology <- read.csv("./CSpine/CSV datasets/radiologyreview.csv")
 injury <- read.csv("./CSpine/CSV datasets/injuryclassification.csv")
@@ -90,7 +94,7 @@ dem <- read.csv("./CSpine/CSV datasets/demographics.csv")
 names(dem)[names(dem) == "studysubjectid"] <- "StudySubjectID"
 av_dem <- merge(av, dem, by="StudySubjectID")
 
-plot_demographics_count <- ggplot(data = av_dem) + 
+plot_demographics_count <- ggplot(data = av_dem[av_dem$Race != "PI" & av_dem$Race != "AI",]) + 
                             geom_count(mapping = aes(x = SITE, y = Race))+
                             ggtitle("Count of Patients by Site and Race")+
                             xlab("Site")+
@@ -573,9 +577,8 @@ ylab('AUC') + ggtitle('Area under ROC Curve Across Varying Mixing Parameters') +
 # ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Varying Mixing Parameters')
 
 ```
-The nonzero $\alpha$ parameters yield similar confidence intervals for both 
-sensitivity and specificity, but the pure ridge regression $\alpha$ yields 
-significantly worse performance.
+The nonzero $\alpha$ parameters yield similar AUC values, but the pure ridge 
+regression $\alpha$ yields significantly worse performance.
 
 As for introducing a perturbation to logistic regression classification, one can 
 adjust the classification threshold. The effect of this is captured in the ROC 
@@ -617,6 +620,7 @@ for (i in unique(avnn$SITE)){
                 axialloadtop + Torticollis2 + LOC + HighriskOtherMV + Clotheslining + 
                 subinj_Face2 + AxialLoadAnyDoc, 
             data = train, family = "binomial")
+  num_preds[avnn$SITE==i] <-  predict(lm.1, type = "response", newdata=test)
 }
 class_preds <- as.numeric(num_preds > 0.079)
 
@@ -646,6 +650,19 @@ num_preds <-  predict(lm.1, type = "response", newdata=av7n)
 class_preds <- as.numeric(num_preds > 0.079)
 # rocs(av7n$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
 site7_metrics <- metrics(av7n$ControlType == "case", class_preds)
+
+df <- data.frame(c(base_metrics[1,1], site7_metrics[1,1]), 
+                 c(base_metrics[1,2], site7_metrics[1,2]), 
+                 c(base_metrics[1,3], site7_metrics[1,3]))
+colnames(df) <- c("Estimate", "Lower CI Bound", "Upper CI Bound")
+rownames(df) <- c("Orig. Training Data", "Site 7 Data")
+df <- df %>% rownames_to_column(" ")
+ft <- flextable(df) %>% 
+  autofit() %>%
+  line_spacing(space = .5, part = "all") %>% 
+  padding(padding = 1, part = "header") 
+ft <- flextable::set_caption(ft, "Sensitivity Confidence Intervals")
+ft
 ```
 As expected, worse performance is observed, as the records from site 7 were 
 excluded from training. 
@@ -670,6 +687,18 @@ num_preds <-  predict(lm.1, type = "response", newdata=avnn_ce)
 class_preds <- as.numeric(num_preds > 0.079)
 # rocs(avnn_ce$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
 subsample_metrics <- metrics(avn_ce$ControlType == "case", class_preds)
+df <- data.frame(c(base_metrics[1,1], subsample_metrics[1,1]), 
+                 c(base_metrics[1,2], subsample_metrics[1,2]), 
+                 c(base_metrics[1,3], subsample_metrics[1,3]))
+colnames(df) <- c("Estimate", "Lower CI Bound", "Upper CI Bound")
+rownames(df) <- c("Orig. Training Data", "Case and EMS Data")
+df <- df %>% rownames_to_column(" ")
+ft <- flextable(df) %>% 
+  autofit() %>%
+  line_spacing(space = .5, part = "all") %>% 
+  padding(padding = 1, part = "header") 
+ft <- flextable::set_caption(ft, "Sensitivity Confidence Intervals")
+ft
 ```
 
 
@@ -892,27 +921,41 @@ for (j in 1:n_bootstraps){
   spec_high = c(spec_high, results[2,3])
 }
 
+sens_sort <- sort(sens, decreasing=T)
+sens_low_sort <- sens_low[order(sens, decreasing=T)]
+sens_high_sort <- sens_high[order(sens, decreasing=T)]
+
+spec_sort <- sort(spec, decreasing=T)
+spec_low_sort <- spec_low[order(spec, decreasing=T)]
+spec_high_sort <- spec_high[order(spec, decreasing=T)]
+
+
 CI_bootstrap_sens <-round(data.frame(x = 1:n_bootstraps,
-                                     sens = sens,
-                                     sens_low = sens_low,
-                                     sens_high = sens_high), 4)
+                                     sens = sens_sort,
+                                     sens_low = sens_low_sort,
+                                     sens_high = sens_high_sort), 4)
   
 # Creating scatter plot with its
 # confindence intervals
 ggplot(CI_bootstrap_sens, aes(x, sens)) + geom_point() + 
-geom_errorbar(aes(ymin = sens_low, ymax = sens_high))+ xlab('Sample') + 
+geom_errorbar(aes(ymin = sens_low, ymax = sens_high))+ xlab('Bootstraps (Sorted by Sensitivity Est.)') + 
 ylab('Sensitivity Estimate') + ggtitle('Sensitivity Estimates Across Bootstraps')
 
 CI_bootstrap_spec <-round(data.frame(x = 1:n_bootstraps,
-                                     spec = spec,
-                                     spec_low = spec_low,
-                                     spec_high = spec_high), 4)
+                                     spec = spec_sort,
+                                     spec_low = spec_low_sort,
+                                     spec_high = spec_high_sort), 4)
   
 # Creating scatter plot with its
 # confindence intervals
 ggplot(CI_bootstrap_spec, aes(x, spec)) + geom_point() + 
+<<<<<<< HEAD
 geom_errorbar(aes(ymin = spec_low, ymax = spec_high)) + xlab('Sample') +
 ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Bootstraps') + theme_bw()
+=======
+geom_errorbar(aes(ymin = spec_low, ymax = spec_high)) + xlab('Bootstraps (Sorted by Specificity Est.)') +
+ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Bootstraps')
+>>>>>>> 00e9311c9587e6f867b345a84ef570445a372ba2
 
 ```
 The sensitivity estimates appear to be more stable than the specificity 
