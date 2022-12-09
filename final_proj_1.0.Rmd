@@ -98,8 +98,11 @@ plot_demographics_count <- ggplot(data = av_dem[av_dem$Race != "PI" & av_dem$Rac
                             geom_count(mapping = aes(x = SITE, y = Race))+
                             ggtitle("Count of Patients by Site and Race")+
                             xlab("Site")+
-                            guides(fill=guide_legend(title="Count"))+
+                            ylab("")+
+                            guides(size=guide_legend(title="Count"))+
                             scale_x_continuous(breaks=seq(1,17,1)) + 
+                            scale_y_discrete(labels=c("W" = "White", "O" = "Other","ND" = "Undisclosed",
+                                                      "B" = "Black","A" = "Asian")) +
                             theme_bw()
 plot_demographics_count
 ```
@@ -116,19 +119,12 @@ not directly comparable with each other, but the variables have already been
 one-hot encoded in the PECARN dataset.
 
 ## Cleaning
-From the original PECARN public use dataset, the amount of cleaning depended on 
-the classifier used. The baseline rule from Leonard et al. and decision trees 
-were both tolerant of missing data, so no additional cleaning was done for these 
-processes. For the lasso selection of variables and logistic regression, records 
-with missing values were removed from the analysis. 
+From the original PECARN public use dataset, the amount of cleaning depended on the classifier used. The baseline rule from Leonard et al. and decision trees were both tolerant of missing data, so no additional cleaning was done for these processes. The same applies to the tree and stub based approaches we explored. For the lasso selection of variables and logistic regression, records with missing values were removed from the analysis. 
 
 ## Training and Evaluation Split
 We assume that in practice, our decision rule will be deployed at hospitals not 
 included in the dataset. Then, to simulate the performance of the models in 
-practice, the data was split into test and training sets based on sites. 
-
-Sites 5, 16, and 17 were randomly chosen as the evaluation sites. 
-Leave-one-out-cross-validation (LOOCV) was conducted over the remaining sites 
+practice, the data was split into test and training sets based on sites. Sites 5, 16, and 17 were randomly chosen as the evaluation sites. Leave-one-out-cross-validation (LOOCV) was conducted over the remaining sites 
 during training. 
 
 # Modeling
@@ -202,7 +198,7 @@ Lasso model, which provide insights into which features are most important
  to the final probability. 
 
 
-```{r, fig.caption = "Plot of order features are added to the Lasso model, as the L1 Norm increases. For a large L1 Norm, the lasso solution is equivalent to the OLS solution."}
+```{r, fig.caption = "Plot of order features are added to the Lasso model, as the L1 Norm increases. For a large L1 Norm, the lasso solution is equivalent to the OLS solution.", fig.height=3.5}
 data_train <- av[av$SITE != 15 & av$SITE != 16 & av$SITE != 7,]
 y <- unlist(lapply(data_train$ControlType, function(x){
   if (x == "case")
@@ -213,6 +209,8 @@ vars <- colnames(av)[5:ncol(av)]
 dat_no_na <- data_train[rowSums(is.na(data_train)) == 0, ]
 X <- dat_no_na[, vars]
 lasso_model <- glmnet(x = X, y = dat_no_na$y, alpha = 1, standardize = TRUE)
+par(oma=c(1,1,1,1))
+par(mar=c(1,2,1,2))
 p1 <- plot(lasso_model,label=TRUE, axes = T)
 ```
 
@@ -225,12 +223,12 @@ sum_0 <- apply(ord, MARGIN = 1, function(r){
 # get features in the order they are added to the model
 sorted_sum <- data.frame(seq(1,16), names(sort(sum_0)[1:16]))
 colnames(sorted_sum) <- c("Order", "Variable")
-ft <- flextable(sorted_sum) %>% 
-  autofit() %>%
-  line_spacing(space = .5, part = "all") %>% 
-  padding(padding = 1, part = "header") 
-ft
-knitr::kable(t(sorted_sum), "pipe", digits = 3)
+#ft <- flextable(sorted_sum) %>% 
+#  autofit() %>%
+#  line_spacing(space = .5, part = "all") %>% 
+#  padding(padding = 1, part = "header") 
+#ft
+knitr::kable(sorted_sum, "pipe", digits = 3)
 ```
 
 
@@ -263,7 +261,7 @@ avnn_reprod2 <- as.numeric(avnn$AlteredMentalStatus == 1 | avnn$FocalNeuroFindin
 
 ### Single Decision Tree Results
 
-```{r, echo=FALSE}
+```{r, cache=TRUE, echo=FALSE}
 avnn<- avn %>% drop_na(vars)
 num_preds <- rep(0, nrow(avnn))
 class_preds <- rep(0, nrow(avnn))
@@ -296,7 +294,7 @@ knitr::kable(metrics(avnn$ControlType == "case", class_preds), "pipe", digits = 
 The final list of predictors used for the decision tree is:
 
 ```{r, echo=FALSE}
-knitr::kable(tree.1$frame[tree.1$frame$ncompete==4,1], col.names = c("Used Covariates"))
+knitr::kable(tree.1$frame[tree.1$frame$ncompete==4,1], "pipe", col.names = c("Used Covariates"))
 ```
 
 And the tree itself can be illustrated as follows:
@@ -312,7 +310,7 @@ One notable advantage to using decisin tree induction, is that most tree inducti
 Next we present the results from simple logistic regression, performed on a set of covariates chosen by the feature selection approaches we outlined above. We combined the sets of covariates selected by forward selection with the set of covariates selected by LASSO and used the intersection of the two sets for higher stability.
 
 
-```{r, echo=FALSE}
+```{r, cache=TRUE, echo=FALSE}
 avnn<- avn %>% drop_na(vars)
 num_preds <- rep(0, nrow(avnn))
 class_preds <- rep(0, nrow(avnn))
@@ -441,7 +439,7 @@ selected by the specific mixing parameter were then used to perform logistic
 regression. To compare the models, the area under the ROC curves (AUC) were 
 calculated.
 
-```{r glmnet-alpha, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
+```{r glmnet-alpha, cache=TRUE, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, fig.width=6, fig.align='center'}
 
 av <- read.csv("./CSpine/CSV datasets/analysisvariables.csv")
 
@@ -550,9 +548,9 @@ for (j in alpha_range){
 alpha_auc_df <- data.frame(x = alpha_range,
                                      y = auc_list)
 
-ggplot(alpha_auc_df, aes(x, y)) + geom_point() + 
+ggplot(alpha_auc_df, aes(x, y)) + geom_point() + geom_line() + 
   xlab('Lasso-Ridge Mixing Parameter') + 
-ylab('AUC') + ggtitle('Area under ROC Curve Across Varying Mixing Parameters') +
+ylab('AUC') + ggtitle('Area under ROC Curve Across Varying \nMixing Parameter') +
   theme_bw()
 # CI_bootstrap_sens <-round(data.frame(x = alpha_range,
 #                                      sens = sens,
@@ -587,7 +585,7 @@ curve of the model presented in the previous section.
 
 ## Data Perturbation
 
-```{r Base-model}
+```{r Base-model, cache=TRUE}
 avn <- av[av$SITE != 15 & av$SITE != 16 & av$SITE != 7,]
 vars <- colnames(av)[5:26]
 avnn<- avn %>% drop_na(vars)
@@ -634,7 +632,7 @@ To examine the effect of changing the covariate distribution of the test set,
 the model was evaluated on the held-out site 7. As seen in Figure 1, site 7 has 
 a higher proportion of of subjects of race group what was not disclosed (ND).
 
-```{r Covariate}
+```{r Covariate, cache=TRUE}
 # data from site 7
 av7 <- av[av$SITE == 7,]
 vars <- colnames(av)[5:26]
@@ -671,7 +669,7 @@ excluded from training.
 The model was evaluated on just the positive injury records and the EMS control 
 group.
 
-```{r Subsampling}
+```{r Subsampling, cache=TRUE}
 # case and ems data
 avn_ce <- av[av$ControlType == 'case' | av$ControlType == 'ems',]
 vars <- colnames(av)[5:26]
@@ -711,7 +709,7 @@ our model in the top 15 factors selected by lasso generated by the bootstrapped
 data.
 
 
-```{r Bootstrap-Lasso}
+```{r Bootstrap-Lasso, fig.width=6, fig.align='center', cache=TRUE}
 source("./routines.R")
 library(glmnet)
 library(ggplot2)
@@ -859,8 +857,12 @@ names(selected_names_freq) <- selected_names
 df_freq <- data.frame(selected_names, selected_names_freq)
 colnames(df_freq) <- c("Feature", "Frequency")
 
+df_freq <- df_freq |> arrange(desc(Frequency))
+df_freq$Feature <- factor(df_freq$Feature, levels=(df_freq |> arrange(Frequency))$Feature)
+
 ggplot(df_freq, aes(y = Feature, x = Frequency)) + geom_bar(stat= "identity", fill = "palegreen3") + 
-  labs(title = "Frequency of Selected Features During Bootstrapping") + theme_bw()
+  ylab("") +
+  labs(title = "Frequency of Selection By Bootstrapping") + theme_bw()
 
 ```
 
@@ -999,10 +1001,12 @@ rownames(df) <- c("Sensitivity", "Specificity")
 df
 ```
 
-```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
-kable(round(df,2), align = 'cccc',
-      caption = 'Decision Rule from Leonard et al. (2011)') %>%
-  kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
+```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '100%', fig.align='center'}
+#kable(round(df,2), align = 'cccc',
+#      caption = 'Decision Rule from Leonard et al. (2011)') %>%
+#  kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
+
+kable(round(df,2), "pipe", caption = 'Decision Rule from Leonard et al. (2011)')
 ```
 
 ## Forward Variable Selection Performance
@@ -1074,7 +1078,7 @@ metrics(avnn$ControlType == "case", avnn_reprod)
 metrics(avnn$ControlType == "case", avnn_reprod2)
 ```
 
-```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
+```{r, cache=TRUE, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
 
 avnn<- avn %>% drop_na(vars)
 num_preds <- rep(0, nrow(avnn))
@@ -1098,7 +1102,7 @@ r <- rocs(avnn$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn
 single_tree_metrics <- metrics(avnn$ControlType == "case", class_preds_tree)
 ```
 
-```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
+```{r, cache=TRUE, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
 kable(round(single_tree_metrics,2), align = 'cccc',
       caption = 'Single Decision Tree with 10 Variables') %>%
 kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
