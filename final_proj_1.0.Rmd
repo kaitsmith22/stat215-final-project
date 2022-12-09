@@ -997,17 +997,18 @@ specificity <- DescTools::BinomCI(nrow(tn), n = nrow(av.spec), method = "wald", 
 
 
 df <- rbind(sensitivity, specificity)
+#df <-  round(df,3)
+#df <-  cbind(c("Sensitivity", "Specificity"), df)
 colnames(df) <- c("Estimate", "Lower CI Bound", "Upper CI Bound")
 rownames(df) <- c("Sensitivity", "Specificity")
 df
 ```
 
-```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '100%', fig.align='center'}
-kable(round(df,2), align = 'cccc',
-      caption = 'Decision Rule from Leonard et al. (2011)') %>%
-  kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
-
-#kable(round(df,2), "pipe", caption = 'Decision Rule from Leonard et al. (2011)')
+```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE}
+#kable(round(df,2), align = 'cccc',
+#      caption = 'Decision Rule from Leonard et al. (2011)') %>%
+#  kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
+knitr::kable(df, "pipe", digits = 3, caption = 'Decision Rule from Leonard et al. (2011)')
 ```
 
 ## Forward Variable Selection Performance
@@ -1038,13 +1039,15 @@ rownames(df) <- c("Sensitivity", "Specificity")
 df
 ```
 
-```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '100%', fig.align='center'}
-kable(round(df,2), align = 'cccc',
-      caption = 'Forward Variable Selection') %>%
-  kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
+```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = 6, fig.align='center'}
+#kable(round(df,2), align = 'cccc',
+#      caption = 'Forward Variable Selection') %>%
+#  kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
+
+knitr::kable(df, "pipe", digits=3, caption = 'Forward Variable Selection')
 ```
 
-# Single Decision Tree Performance
+## Single Decision Tree Performance
 We tested the single decision tree model (using the aforementioned ten variables) to the three test sites. The sensitivity and specificity was 91% (95% CI 85% to 96%) and 47% (95% CI 42% and 52%), respectively. Compared to the baseline, there were increases in both the sensitivity (6% increase) and in the specificity (3% increase).
 
 ```{r, echo = FALSE, include=FALSE, message = FALSE, warning= FALSE}
@@ -1099,17 +1102,19 @@ for (i in unique(avn$SITE)){
   num_preds[avnn$SITE==i] <-  predict(tree.1, newdata=test)[,1]
   class_preds_tree[avnn$SITE==i] <-  as.numeric(predict(tree.1, newdata=test, type="class"))-1
 }
-r <- rocs(avnn$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
+r <- rocs(avnn$ControlType == "case", num_preds, class_preds_tree,  avnn_reprod, avnn_reprod2)
 single_tree_metrics <- metrics(avnn$ControlType == "case", class_preds_tree)
 ```
 
 ```{r, cache=TRUE, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '100%', fig.align='center'}
-kable(round(single_tree_metrics,2), align = 'cccc',
-      caption = 'Single Decision Tree with 10 Variables') %>%
-kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
+#kable(round(single_tree_metrics,2), align = 'cccc',
+#      caption = 'Single Decision Tree with 10 Variables') %>%
+#kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
+
+knitr::kable(df, "pipe", digits=3, caption = 'Single Decision Tree with 10 Variables')
 ```
 
-# Gradient-Boosted Tree Performance
+## Gradient-Boosted Tree Performance
 We tested the gradient-boosted decision tree model to the three test sites. The sensitivity and specificity was 92% (95% CI 86% to 97%) and 41% (95% CI 36% and 46%), respectively. Compared to the single-tree model, there was a slight increase in the sensitivity (1% increase) and decrease in the specificity (6% decrease). Compared to the baseline, there was an increase in the sensitivity (7% increase) and a decrease in the specificity (3% decrease).
 ```{r gradient boosted trees or stubs, cache=TRUE, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '100%', fig.align='center'}
 
@@ -1139,18 +1144,19 @@ for (i in unique(avn$SITE)){
 
 class_preds <- as.numeric(num_preds > 0.087)
 
-rocs(avnn$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
+r <- rocs(avnn$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
 gb_tree_metrics <- metrics(avnn$ControlType == "case", class_preds)
 
 ```
 
-```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
-kable(round(gb_tree_metrics,2), align = 'cccc',
-      caption = 'Gradient-Boosted Tree') %>%
-kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
+```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE}
+#kable(round(gb_tree_metrics,2), align = 'cccc',
+#      caption = 'Gradient-Boosted Tree') %>%
+#kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
+knitr::kable(df, "pipe", digits=3, caption = 'Gradient-Boosted Tree                  ')
 ```
 
-# Logistic Regression
+## Logistic Regression
 We tested the logistic regression model (based on all variables from feature selection) to the three test sites. The sensitivity and specificity was 88% (95% CI 82% to 95%) and 43% (95% CI 38% and 48%), respectively. Compared to the baseline, there were increases in both the sensitivity (3% increase) and in the specificity (1% increase).
 
 ```{r logistic regression (2), echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
@@ -1182,15 +1188,17 @@ for (i in unique(avnn$SITE)){
   num_preds[avnn$SITE==i] <-  predict(lm.1, type = "response", newdata=test)
 }
 class_preds <- as.numeric(num_preds > 0.079)
-rocs(avnn$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
+r <- rocs(avnn$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
 LR_metrics <- metrics(avnn$ControlType == "case", class_preds)
 ```
 
 
-```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '100%', fig.align='center'}
-kable(round(LR_metrics,2), align = 'cccc',
-      caption = 'Logistic Regression') %>%
-kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
+```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE}
+#kable(round(LR_metrics,2), align = 'cccc',
+#      caption = 'Logistic Regression') %>%
+#kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
+
+knitr::kable(df, "pipe", digits=3, caption = 'Logistic Regression')
 ```
 
 To interpret potential patterns in the errors, we examine the means of each feature for the misclassified groups and correctly classified groups from the 
