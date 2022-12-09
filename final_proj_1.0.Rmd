@@ -550,7 +550,7 @@ alpha_auc_df <- data.frame(x = alpha_range,
 
 ggplot(alpha_auc_df, aes(x, y)) + geom_point() + geom_line() + 
   xlab('Lasso-Ridge Mixing Parameter') + 
-ylab('AUC') + ggtitle('Area under ROC Curve Across Varying \nMixing Parameter') +
+ylab('AUC') + ggtitle('Area under ROC Curve Across Varying Mixing Parameter') +
   theme_bw()
 # CI_bootstrap_sens <-round(data.frame(x = alpha_range,
 #                                      sens = sens,
@@ -632,7 +632,7 @@ To examine the effect of changing the covariate distribution of the test set,
 the model was evaluated on the held-out site 7. As seen in Figure 1, site 7 has 
 a higher proportion of of subjects of race group what was not disclosed (ND).
 
-```{r Covariate, cache=TRUE}
+```{r Covariate}
 # data from site 7
 av7 <- av[av$SITE == 7,]
 vars <- colnames(av)[5:26]
@@ -669,7 +669,7 @@ excluded from training.
 The model was evaluated on just the positive injury records and the EMS control 
 group.
 
-```{r Subsampling, cache=TRUE}
+```{r Subsampling}
 # case and ems data
 avn_ce <- av[av$ControlType == 'case' | av$ControlType == 'ems',]
 vars <- colnames(av)[5:26]
@@ -873,7 +873,7 @@ appear less frequently.
 The stability of the logistic regression classifier under bootstrapping was also 
 analyzed. The sensitivity and specificity confidence intervals of each bootstrap 
 were recorded and are plotted below.
-```{r Bootstrap-Logistic}
+```{r Bootstrap-Logistic, cache=TRUE}
 for (j in 1:n_bootstraps){
   avn_boot <- avn[sample(nrow(avn),size=nrow(avn),replace=TRUE),]
   avnn <- avn_boot %>% drop_na(vars)
@@ -967,6 +967,7 @@ As stated in the subsection _Training and Evaluation Split_, three hospitals wer
 
 ## Baseline Performance
 We first applied the decision rule derived by Leonard et al. (2021) to the three test sites to evaluate the baseline performance, to which the relative performance of our models would later be evaluated. Using the 6-variable decision rule (altered mental status, focal neurologic deficit, complaint of neck pain, substantial injury to the torso, high-risk motor vehicle crash, and diving), the sensitivity and specificity of identifying cervical spine injury by the presence of at least one of these six factors were 85% (95% CI 78% to 92%) and 44% (95% CI 39% and 49%), respectively. 
+
 ```{r sensitivity decision rule from paper, echo = FALSE, include=FALSE, message = FALSE, warning= FALSE}
 av <- read.csv("./CSpine/CSV datasets/analysisvariables.csv")
 # THE THREE EVALUATION SITES ONLY
@@ -1002,17 +1003,17 @@ df
 ```
 
 ```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '100%', fig.align='center'}
-#kable(round(df,2), align = 'cccc',
-#      caption = 'Decision Rule from Leonard et al. (2011)') %>%
-#  kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
+kable(round(df,2), align = 'cccc',
+      caption = 'Decision Rule from Leonard et al. (2011)') %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
 
-kable(round(df,2), "pipe", caption = 'Decision Rule from Leonard et al. (2011)')
+#kable(round(df,2), "pipe", caption = 'Decision Rule from Leonard et al. (2011)')
 ```
 
 ## Forward Variable Selection Performance
 We then applied the decision rule derived by using forward variable selection on the decision rule by Leonard et al. (2011) to the three test sites. This decision rule consisted of four additional variables: conditions predisposing to cervical spine injury, high-risk hit by car, axial load to top of the head, and injury by clothes-lining. (Note that at each forward step, the forward selection process adds the one variable that gives the single best improvement to the model. Hence, it is possible for the final model to contain variables that are significant when added at each respective step but are no longer as significant in the presence of subsequently added variables (Leonard et al. 2021).) The sensitivity and specificity of identifying cervical spine injury by the presence of at least one of these ten factors was 88% (95% CI 82% to 95%) and 30% (95% CI 26% and 35%), respectively. Compared to the baseline, there was a slight increase in the sensitivity (3% increase) and decrease in the specificity (14% decrease). 
 
-```{r sensitivity from forward selection, echo = FALSE, include=FALSE, message = FALSE, warning= FALSE}
+```{r sensitivity from forward selection, echo = FALSE, include=FALSE, message = FALSE, warning= FALSE, cache=TRUE}
 av.sense <- av %>% drop_na(vars) %>% filter(ControlType == "case")
 
 tp <- av.sense %>% filter(AlteredMentalStatus == 1 |  FocalNeuroFindings == 1 | PainNeck == 1 |  SubInj_TorsoTrunk == 1 | Predisposed == 1 | HighriskDiving == 1 | HighriskHitByCar == 1 | HighriskMVC == 1 |        
@@ -1037,7 +1038,7 @@ rownames(df) <- c("Sensitivity", "Specificity")
 df
 ```
 
-```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
+```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '100%', fig.align='center'}
 kable(round(df,2), align = 'cccc',
       caption = 'Forward Variable Selection') %>%
   kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
@@ -1078,7 +1079,7 @@ metrics(avnn$ControlType == "case", avnn_reprod)
 metrics(avnn$ControlType == "case", avnn_reprod2)
 ```
 
-```{r, cache=TRUE, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
+```{r, cache=TRUE, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '100%', fig.align='center'}
 
 avnn<- avn %>% drop_na(vars)
 num_preds <- rep(0, nrow(avnn))
@@ -1102,7 +1103,7 @@ r <- rocs(avnn$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn
 single_tree_metrics <- metrics(avnn$ControlType == "case", class_preds_tree)
 ```
 
-```{r, cache=TRUE, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
+```{r, cache=TRUE, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '100%', fig.align='center'}
 kable(round(single_tree_metrics,2), align = 'cccc',
       caption = 'Single Decision Tree with 10 Variables') %>%
 kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
@@ -1110,7 +1111,7 @@ kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HO
 
 # Gradient-Boosted Tree Performance
 We tested the gradient-boosted decision tree model to the three test sites. The sensitivity and specificity was 92% (95% CI 86% to 97%) and 41% (95% CI 36% and 46%), respectively. Compared to the single-tree model, there was a slight increase in the sensitivity (1% increase) and decrease in the specificity (6% decrease). Compared to the baseline, there was an increase in the sensitivity (7% increase) and a decrease in the specificity (3% decrease).
-```{r gradient boosted trees or stubs, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
+```{r gradient boosted trees or stubs, cache=TRUE, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '100%', fig.align='center'}
 
 avnn<- avn %>% drop_na(vars)
 
@@ -1120,7 +1121,7 @@ class_preds <- rep(0, nrow(avnn))
 for (i in unique(avn$SITE)){
   train <-  avn[avn$SITE!=i,]
   test <-  avnn[avnn$SITE==i,]
-  
+
   gbm.1 <- gbm(as.numeric(ControlType == "case")~. - SITE - StudySubjectID - CaseID, data=train,
              distribution = "bernoulli",
               n.trees = 90,
@@ -1186,7 +1187,7 @@ LR_metrics <- metrics(avnn$ControlType == "case", class_preds)
 ```
 
 
-```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
+```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '100%', fig.align='center'}
 kable(round(LR_metrics,2), align = 'cccc',
       caption = 'Logistic Regression') %>%
 kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
@@ -1255,7 +1256,6 @@ p2 <- ggplot(to_plot, aes(y = Feature)) + geom_bar(stat="identity", aes(x = Aver
 
 ggarrange(p1, p2)
 ```
-
 
 
 # Summary
