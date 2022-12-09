@@ -107,7 +107,10 @@ In the figure above, it is clear that the patients are not equally distributed
 across PECARN sites, as the racial distribution of patients varies visually 
 across sites.
 
-Leonard et al. 6 major variables that are associated with CSI: altered mental status, focal neurological deficit, complaint of neck
+We also used the same features developed by Leanoard et al. These features 
+provide data on how the patient was injured, any pre-existing condition the patient may have,
+and the symptoms of the patient, which are defined in Table 2 of Leonard et al. 
+Leonard et al. determined 6 major variables that are associated with CSI: altered mental status, focal neurological deficit, complaint of neck
 pain, substantial injury to the torso, high-risk motor vehicle
 crash, and diving. Our analyses focused on these factors, as these were the only 
 clinical variables that were provided for all 3,314 records. Each variable is 
@@ -856,7 +859,7 @@ names(selected_names_freq) <- selected_names
 df_freq <- data.frame(selected_names, selected_names_freq)
 colnames(df_freq) <- c("Feature", "Frequency")
 
-df_freq$Feature <- factor(df_freq$Feature, levels=(df_freq |> arrange(Frequency))$Feature)
+df_freq$Feature <- factor(df_freq$Feature, levels=(df_freq %>% arrange(Frequency))$Feature)
 
 ggplot(df_freq, aes(y = Feature, x = Frequency)) + geom_bar(stat= "identity", fill = "palegreen3") + 
   ylab("") +
@@ -1108,7 +1111,7 @@ single_tree_metrics <- metrics(avnn$ControlType == "case", class_preds_tree)
 #      caption = 'Single Decision Tree with 10 Variables') %>%
 #kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
 
-knitr::kable(df, "pipe", digits=3, caption = 'Single Decision Tree with 10 Variables')
+knitr::kable(single_tree_metrics, "pipe", digits=3, caption = 'Single Decision Tree with 10 Variables')
 ```
 
 ## Gradient-Boosted Tree Performance
@@ -1150,7 +1153,7 @@ gb_tree_metrics <- metrics(avnn$ControlType == "case", class_preds)
 #kable(round(gb_tree_metrics,2), align = 'cccc',
 #      caption = 'Gradient-Boosted Tree') %>%
 #kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
-knitr::kable(df, "pipe", digits=3, caption = 'Gradient-Boosted Tree                  ')
+knitr::kable(gb_tree_metrics, "pipe", digits=3, caption = 'Gradient-Boosted Tree                  ')
 ```
 
 ## Logistic Regression
@@ -1195,7 +1198,7 @@ LR_metrics <- metrics(avnn$ControlType == "case", class_preds)
 #      caption = 'Logistic Regression') %>%
 #kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
 
-knitr::kable(df, "simple", digits=3, caption = 'Logistic Regression') |> kable_styling(full_width = T)
+knitr::kable(LR_metrics, "simple", digits=3, caption = 'Logistic Regression') %>% kable_styling(full_width = T)
 ```
 
 To interpret potential patterns in the errors, we examine the means of each feature for the misclassified groups and correctly classified groups from the 
