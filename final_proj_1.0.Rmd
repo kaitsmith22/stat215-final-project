@@ -194,7 +194,7 @@ Lasso model, which provide insights into which features are most important
  to the final probability. 
 
 
-```{r, fig.caption = "Plot of order features are added to the Lasso model, as the L1 Norm increases. For a large L1 Norm, the lasso solution is equivalent to the OLS solution.", fig.height=3.5}
+```{r, fig.caption = "Plot of order features are added to the Lasso model, as the L1 Norm increases. For a large L1 Norm, the lasso solution is equivalent to the OLS solution.", fig.height=3.5, fig.width=6}
 data_train <- av[av$SITE != 15 & av$SITE != 16 & av$SITE != 7,]
 y <- unlist(lapply(data_train$ControlType, function(x){
   if (x == "case")
@@ -205,9 +205,10 @@ vars <- colnames(av)[5:ncol(av)]
 dat_no_na <- data_train[rowSums(is.na(data_train)) == 0, ]
 X <- dat_no_na[, vars]
 lasso_model <- glmnet(x = X, y = dat_no_na$y, alpha = 1, standardize = TRUE)
-par(oma=c(1,1,1,1))
-par(mar=c(1,2,1,2))
+#par(oma=c(2,2,1,1))
+par(mar=c(4,4,1,1))
 p1 <- plot(lasso_model,label=TRUE, axes = T)
+grid()
 ```
 
 
@@ -287,13 +288,11 @@ As we can see, classification tree prodcues an ROC curve with AUC = 0.78. The cu
 knitr::kable(metrics(avnn$ControlType == "case", class_preds), "pipe", digits = 3)
 ```
 
-The final list of predictors used for the decision tree is:
+The list of predictors used and the decition tree itself are the following:
 
 ```{r, echo=FALSE}
 knitr::kable(tree.1$frame[tree.1$frame$ncompete==4,1], "pipe", col.names = c("Used Covariates"))
 ```
-
-And the tree itself can be illustrated as follows:
 
 ```{r, echo=FALSE}
 rpart.plot(tree.1)
@@ -651,12 +650,14 @@ df <- data.frame(c(base_metrics[1,1], site7_metrics[1,1]),
 colnames(df) <- c("Estimate", "Lower CI Bound", "Upper CI Bound")
 rownames(df) <- c("Orig. Training Data", "Site 7 Data")
 df <- df %>% rownames_to_column(" ")
-ft <- flextable(df) %>% 
-  autofit() %>%
-  line_spacing(space = .5, part = "all") %>% 
-  padding(padding = 1, part = "header") 
-ft <- flextable::set_caption(ft, "Sensitivity Confidence Intervals")
-ft
+#ft <- flextable(df) %>% 
+#  autofit() %>%
+#  line_spacing(space = .5, part = "all") %>% 
+#  padding(padding = 1, part = "header") 
+#ft <- flextable::set_caption(ft, "Sensitivity Confidence Intervals")
+#ft
+
+knitr::kable(df, "pipe", digits=3)
 ```
 As expected, worse performance is observed, as the records from site 7 were 
 excluded from training. 
@@ -687,12 +688,14 @@ df <- data.frame(c(base_metrics[1,1], subsample_metrics[1,1]),
 colnames(df) <- c("Estimate", "Lower CI Bound", "Upper CI Bound")
 rownames(df) <- c("Orig. Training Data", "Case and EMS Data")
 df <- df %>% rownames_to_column(" ")
-ft <- flextable(df) %>% 
-  autofit() %>%
-  line_spacing(space = .5, part = "all") %>% 
-  padding(padding = 1, part = "header") 
-ft <- flextable::set_caption(ft, "Sensitivity Confidence Intervals")
-ft
+#ft <- flextable(df) %>% 
+#  autofit() %>%
+#  line_spacing(space = .5, part = "all") %>% 
+#  padding(padding = 1, part = "header") 
+#ft <- flextable::set_caption(ft, "Sensitivity Confidence Intervals")
+#ft
+
+knitr::kable(df, "pipe", digits=3)
 ```
 
 
@@ -853,7 +856,6 @@ names(selected_names_freq) <- selected_names
 df_freq <- data.frame(selected_names, selected_names_freq)
 colnames(df_freq) <- c("Feature", "Frequency")
 
-df_freq <- df_freq |> arrange(desc(Frequency))
 df_freq$Feature <- factor(df_freq$Feature, levels=(df_freq |> arrange(Frequency))$Feature)
 
 ggplot(df_freq, aes(y = Feature, x = Frequency)) + geom_bar(stat= "identity", fill = "palegreen3") + 
@@ -936,8 +938,8 @@ CI_bootstrap_sens <-round(data.frame(x = 1:n_bootstraps,
 # Creating scatter plot with its
 # confindence intervals
 ggplot(CI_bootstrap_sens, aes(x, sens)) + geom_point() + 
-geom_errorbar(aes(ymin = sens_low, ymax = sens_high))+ xlab('Bootstraps (Sorted by Sensitivity Est.)') + 
-ylab('Sensitivity Estimate') + ggtitle('Sensitivity Estimates Across Bootstraps')
+  geom_errorbar(aes(ymin = sens_low, ymax = sens_high))+ xlab('Bootstraps (Sorted by Sensitivity Est.)') + 
+  ylab('Sensitivity Estimate') + ggtitle('Sensitivity Estimates Across Bootstraps') + theme_bw()
 
 CI_bootstrap_spec <-round(data.frame(x = 1:n_bootstraps,
                                      spec = spec_sort,
@@ -947,9 +949,8 @@ CI_bootstrap_spec <-round(data.frame(x = 1:n_bootstraps,
 # Creating scatter plot with its
 # confindence intervals
 ggplot(CI_bootstrap_spec, aes(x, spec)) + geom_point() + 
-
-geom_errorbar(aes(ymin = spec_low, ymax = spec_high)) + xlab('Sample') +
-ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Bootstraps') + theme_bw()
+  geom_errorbar(aes(ymin = spec_low, ymax = spec_high)) + xlab('Sample') +
+  ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Bootstraps') + theme_bw()
 
 ```
 The sensitivity estimates appear to be more stable than the specificity 
@@ -1155,7 +1156,7 @@ knitr::kable(df, "pipe", digits=3, caption = 'Gradient-Boosted Tree             
 ## Logistic Regression
 We tested the logistic regression model (based on all variables from feature selection) to the three test sites. The sensitivity and specificity was 88% (95% CI 82% to 95%) and 43% (95% CI 38% and 48%), respectively. Compared to the baseline, there were increases in both the sensitivity (3% increase) and in the specificity (1% increase).
 
-```{r logistic regression (2), echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
+```{r logistic regression (2), echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, fig.align='center'}
 # CHANGE FACTORS 
 
 avnn<- avn %>% drop_na(vars)
@@ -1194,7 +1195,7 @@ LR_metrics <- metrics(avnn$ControlType == "case", class_preds)
 #      caption = 'Logistic Regression') %>%
 #kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
 
-knitr::kable(df, "pipe", digits=3, caption = 'Logistic Regression')
+knitr::kable(df, "simple", digits=3, caption = 'Logistic Regression') |> kable_styling(full_width = T)
 ```
 
 To interpret potential patterns in the errors, we examine the means of each feature for the misclassified groups and correctly classified groups from the 
@@ -1265,7 +1266,6 @@ ggarrange(p1, p2)
 # Summary
 By investigating primary source data for cervical spine injury (CSI) in children, we derived and validated a clinical decision rule that aims to guide imaging decisions for children who experienced blunt trauma (e.g., altered mental status, focal neurologic deficits, complaint of neck pain, torticollis). Based on our results and stability check, we believe that our decision rule will (1) provide satisfactory performance when applied to future data and (2) perform better than the baseline case in terms of both specificity and sensitivity.
 
-\newpage
 # Citations 
 
 [1] Leonard, J. C., Browne, L. R., Ahmad, F. A., Schwartz, H., Wallendorf, M., Leonard, J. R., Lerner, E. B., & Kuppermann, N. (2019). Cervical Spine Injury Risk Factors in Children With Blunt Trauma. Pediatrics, 144(1), e20183221. https://doi.org/10.1542/peds.2018-3221
