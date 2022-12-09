@@ -949,13 +949,9 @@ CI_bootstrap_spec <-round(data.frame(x = 1:n_bootstraps,
 # Creating scatter plot with its
 # confindence intervals
 ggplot(CI_bootstrap_spec, aes(x, spec)) + geom_point() + 
-<<<<<<< HEAD
+
 geom_errorbar(aes(ymin = spec_low, ymax = spec_high)) + xlab('Sample') +
 ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Bootstraps') + theme_bw()
-=======
-geom_errorbar(aes(ymin = spec_low, ymax = spec_high)) + xlab('Bootstraps (Sorted by Specificity Est.)') +
-ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Bootstraps')
->>>>>>> 00e9311c9587e6f867b345a84ef570445a372ba2
 
 ```
 The sensitivity estimates appear to be more stable than the specificity 
