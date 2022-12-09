@@ -32,6 +32,7 @@ library(rpart)
 library(rpart.plot)
 library(kableExtra)
 library(gbm)
+library(pROC)
 
 source("./routines.R")
 
@@ -59,6 +60,7 @@ high sensitivity.
 # Data
 
 ## Data Collection
+
 The data was taken from the Pediatric Emergency Care Applied Research Network 
 (PECARN) public use dataset titled "Predicting Cervical Spine Injury (CSI) in 
 Children: A Multi-Centered Case-Control Analysis". A total of 17 PECARN sites 
@@ -72,7 +74,7 @@ Blunt Trauma" by Leonard et al.
 Of the 3,314 records, 540 are deemed positive cervical spine injuries from 
 radiology reports or spine consultation. These positive injury records were 
 verified by the principal investigator of Leonard et al. and by a pediatric 
-neurosurgeon[CITATION]. The remaining 2,774 controls fall into three control 
+neurosurgeon[Lenoard et al]. The remaining 2,774 controls fall into three control 
 groups: 1,060 unmatched random controls, 1,012 mechanism-of-injury and age 
 matched controls, and 702 age-matched EMS controls. 
 
@@ -93,7 +95,8 @@ plot_demographics_count <- ggplot(data = av_dem) +
                             ggtitle("Count of Patients by Site and Race")+
                             xlab("Site")+
                             guides(fill=guide_legend(title="Count"))+
-                            scale_x_continuous(breaks=seq(1,17,1))
+                            scale_x_continuous(breaks=seq(1,17,1)) + 
+                            theme_bw()
 plot_demographics_count
 ```
 
@@ -101,9 +104,8 @@ In the figure above, it is clear that the patients are not equally distributed
 across PECARN sites, as the racial distribution of patients varies visually 
 across sites.
 
-Leonard et al. 8 major variables that are associated with CSI: altered mental 
-status, focal neurological deficits, complaint of neck pain, torticollis,
-substantial injury to the torso, predisposing condition, high-risk motor vehicle
+Leonard et al. 6 major variables that are associated with CSI: altered mental status, focal neurological deficit, complaint of neck
+pain, substantial injury to the torso, high-risk motor vehicle
 crash, and diving. Our analyses focused on these factors, as these were the only 
 clinical variables that were provided for all 3,314 records. Each variable is 
 not directly comparable with each other, but the variables have already been 
@@ -131,10 +133,11 @@ during training.
 
 First, we implemented the clinical decision rule found in Leonard et al. This
 study determined a clinical decision rule by selecting features using forward selection 
-with logistic regression. For each iteration, the algorithm would add the feature whose p-value from 
-the Chi-squared statistic was smallest when that feature is added to the model, versus when any other
+with logistic regression. For each iteration of the forward selection process, the algorithm would add the feature whose p-value from 
+the Chi-squared statistic was smallest when that feature is added to the model, versus the p-value from when any other
  feature was added. The algorithm stopped adding features when no additional feature 
- resulted in a p-value less than 0.05. 1000 samples were bootstrapped and a new logistic regression model was computed each time. A covariate was included in the final model if it appeared in over 50% of the bootstrapped models. This process 
+ resulted in a p-value less than 0.05. 1000 samples were then bootstrapped and a new logistic regression model was computed each time. 
+ A covariate was included in the final decision rule if it appeared in over 50% of the bootstrapped models. This process 
 was repeated for each control group: random, EMS, and mechanism of injury controls. 
 The forward selection logistic regression models identified 6 common covariates between these 3 models: altered mental status, focal neurological deficit, complaint of neck
 pain, substantial injury to the torso, high-risk motor vehicle
@@ -146,16 +149,17 @@ Although the report did not specify how missing values
 are handled, we removed samples where any of the covariates were missing, since 
 our protocol in R was to remove NA values in logistic regression. 
 We calculated this decision rule to have the following metrics, where patients from 
-all 3 controll groups were included:
+all 3 control groups were included:
 
 ```{r, fig.caption = "Baseline metrics calculated from Leonard et al."}
 df <- data.frame(c("Sensitivity", "Specificity"), c(0.9064588, 0.4053537), c(0.8795248,  0.3843153), c(0.9333928, 0.4263922))
 colnames(df) <- c("Metric", "Estimate", "Lower CI Bound", "Upper CI Bound")
-ft <- flextable(df) %>% 
-  autofit() %>%
-  line_spacing(space = .5, part = "all") %>% 
-  padding(padding = 1, part = "header") 
-ft
+# ft <- flextable(df) %>% 
+#   autofit() %>%
+#   line_spacing(space = .5, part = "all") %>% 
+#   padding(padding = 1, part = "header") 
+# ft
+knitr::kable(df, "pipe", digits = 3)
 ```
 
 Although the value for sensitivity is 2% lower and the value for specificity is 5%
@@ -175,7 +179,7 @@ We first outline our feature selection approaches, then present out classificati
 
 First, we selected features using forward selection with logistic regression,
 similar to the method used by Leonard et al. We started with an empty model,
-and added features sequentially, including the feature with the smallest p-value each.
+and added features sequentially, including the feature with the smallest p-value each iteration.
 However, we stopped when there was no feature 
 with a p-value less than $0.15$, instead of $0.05$ used in the feature selection method by Leonard et al.
 We then proceeded with the 
@@ -184,7 +188,7 @@ bootstrapped models.
 
 ### Lasso Logistic Regression (L1 regularization)
 
-Next, we selected features from a Lasoo logistic regression model. First,
+Next, we selected features from a Lasso logistic regression model. First,
 we completed 10 fold cross validation to find the value of $lambda$ that 
 minimizes the $L1$ loss for the training data. We then selected the features from this 
 model that had non-zero regression coefficients. 
@@ -222,12 +226,13 @@ ft <- flextable(sorted_sum) %>%
   line_spacing(space = .5, part = "all") %>% 
   padding(padding = 1, part = "header") 
 ft
+knitr::kable(t(sorted_sum), "pipe", digits = 3)
 ```
 
 
 ## Classification Experiments
 
-The first classification approach we will present is the single decision tree approach. For that we used the rpart R package [citation], and compared the cross validation results with the results from the Leonard et al paper.
+The first classification approach we will present is the single decision tree approach. For that we used the rpart R package [Therneau], and compared the cross validation results with the results from the Leonard et al paper.
 
 ```{r, echo=FALSE}
 vars <- colnames(av)[5:35]
@@ -425,6 +430,7 @@ a sense on how certain variables affect the outcome more than others.
 # Stability
 
 ## Model Perturbation
+
 The effect of varying the elasticnet mixing parameter, or the mixture of the 
 L1 lasso penalty and L2 ridge penalty, was analyzed. The top 15 variables 
 selected by the specific mixing parameter were then used to perform logistic 
@@ -432,7 +438,7 @@ regression. To compare the models, the area under the ROC curves (AUC) were
 calculated.
 
 ```{r glmnet-alpha, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
-library(pROC)
+
 av <- read.csv("./CSpine/CSV datasets/analysisvariables.csv")
 
 vars <- colnames(av)[5:ncol(av)]
@@ -542,7 +548,8 @@ alpha_auc_df <- data.frame(x = alpha_range,
 
 ggplot(alpha_auc_df, aes(x, y)) + geom_point() + 
   xlab('Lasso-Ridge Mixing Parameter') + 
-ylab('AUC') + ggtitle('Area under ROC Curve Across Varying Mixing Parameters') 
+ylab('AUC') + ggtitle('Area under ROC Curve Across Varying Mixing Parameters') +
+  theme_bw()
 # CI_bootstrap_sens <-round(data.frame(x = alpha_range,
 #                                      sens = sens,
 #                                      sens_low = sens_low,
@@ -618,9 +625,10 @@ base_metrics <- metrics(avnn$ControlType == "case", class_preds)
 
 
 ### Change in Covariate Distribution During Testing
+
 To examine the effect of changing the covariate distribution of the test set, 
 the model was evaluated on the held-out site 7. As seen in Figure 1, site 7 has 
-a higher proportion of of subjects of race group ND.
+a higher proportion of of subjects of race group what was not disclosed (ND).
 
 ```{r Covariate}
 # data from site 7
@@ -667,6 +675,7 @@ subsample_metrics <- metrics(avn_ce$ControlType == "case", class_preds)
 
 
 ### Stability under Bootstrapping
+
 In addition, we observed the stability our model under bootstraps. For the lasso 
 selection of variables, we analyze the frequency of the original 15 factors in 
 our model in the top 15 factors selected by lasso generated by the bootstrapped 
@@ -818,9 +827,12 @@ for (i in 1:n_bootstraps){
 }
 names(selected_names_freq) <- selected_names
 
-barplot(selected_names_freq, 
-        main = "Frequency of Selected Features During Bootstrapping", 
-        xlab = 'Feature', ylab = 'Frequency', las = 2, cex.names = 0.5)
+df_freq <- data.frame(selected_names, selected_names_freq)
+colnames(df_freq) <- c("Feature", "Frequency")
+
+ggplot(df_freq, aes(y = Feature, x = Frequency)) + geom_bar(stat= "identity", fill = "palegreen3") + 
+  labs(title = "Frequency of Selected Features During Bootstrapping") + theme_bw()
+
 ```
 
 We can see that the top of the original factors appear in the bootstrapped 
@@ -900,7 +912,7 @@ CI_bootstrap_spec <-round(data.frame(x = 1:n_bootstraps,
 # confindence intervals
 ggplot(CI_bootstrap_spec, aes(x, spec)) + geom_point() + 
 geom_errorbar(aes(ymin = spec_low, ymax = spec_high)) + xlab('Sample') +
-ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Bootstraps')
+ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Bootstraps') + theme_bw()
 
 ```
 The sensitivity estimates appear to be more stable than the specificity 
@@ -908,6 +920,7 @@ estimates, as the sensitivity confidence intervals share more overlap.
 
 
 # Evaluation
+
 ## Three Test Sites
 As stated in the subsection _Training and Evaluation Split_, three hospitals were randomly chosen as the sites for evaluation: 5, 16, and 17. These three sites were left out during the exploratory data analysis, model training, and model stability assessment.
 
@@ -1026,7 +1039,7 @@ metrics(avnn$ControlType == "case", avnn_reprod2)
 
 avnn<- avn %>% drop_na(vars)
 num_preds <- rep(0, nrow(avnn))
-class_preds <- rep(0, nrow(avnn))
+class_preds_tree <- rep(0, nrow(avnn))
 #num_preds <- rep(0, nrow(avn))
 #class_preds <- rep(0, nrow(avn))
 for (i in unique(avn$SITE)){
@@ -1040,10 +1053,10 @@ for (i in unique(avn$SITE)){
                   parms = list(prior = c(.32,.68)))
   
   num_preds[avnn$SITE==i] <-  predict(tree.1, newdata=test)[,1]
-  class_preds[avnn$SITE==i] <-  as.numeric(predict(tree.1, newdata=test, type="class"))-1
+  class_preds_tree[avnn$SITE==i] <-  as.numeric(predict(tree.1, newdata=test, type="class"))-1
 }
 r <- rocs(avnn$ControlType == "case", num_preds, class_preds,  avnn_reprod, avnn_reprod2)
-single_tree_metrics <- metrics(avnn$ControlType == "case", class_preds)
+single_tree_metrics <- metrics(avnn$ControlType == "case", class_preds_tree)
 ```
 
 ```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
@@ -1136,42 +1149,78 @@ kable(round(LR_metrics,2), align = 'cccc',
 kable_styling(bootstrap_options = "striped", full_width = F, latex_options = "HOLD_position")
 ```
 
-To interpret potential patterns in the errors, we examine the means of each feature for the misclassified groups and correctly classified groups. __TO DO: need more explanation__
+To interpret potential patterns in the errors, we examine the means of each feature for the misclassified groups and correctly classified groups from the 
+regression tree model, as this model resulted in the best performance compared to the baseline. In the bar graphs 
+below, we analyze the average value of each feature in the set the model correclty labeled, versus the 
+set on data points the model miss-classified for both true positives and true negatives. Although the decision tree split the data on 4 features,
+ the average values for all of the features are presented below, to help 
+ identify any patterns that the model may have missed. For example, more cases 
+ where the "ambulatory" feature was present in the data were misclassified: both in
+  the true positive and true negative case. However, the top node of the decision
+  tree, FocalNeuroFindings2, is present in a high percentage of the correctly labelled positive cases,
+   while it is present in a smaller percentage of the incorreclty labelled negative cases. Ultimately, 
+   these bar plots demonstrate the trade-off between sensitivity and specificity. If we were to 
+   decrease the incorrectly labelled false positives, we would increase the number of 
+   false negatives.
 
-```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center'}
-# TESTING DATA
-data_test <- av %>% filter(SITE == 5 | SITE == 16 | SITE == 15)
-y <- unlist(lapply(data_test$ControlType, function(x){
-  if (x == "case")
-    {return (1)} 
-  else 0}))
-data_test$y <- y
-dat_no_na <- data_test[rowSums(is.na(data_test)) == 0, ]
+```{r, echo = FALSE, include=TRUE, message = FALSE, warning= FALSE, out.width = '80%', fig.align='center', fig.height = 6, fig.width = 11}
+eval_correct <- avnn[avnn$ControlType == "case" & class_preds_tree == 1, ][, 5:36]
 
+eval_false <- avnn[avnn$ControlType == "case" & class_preds_tree == 0, ][, 5:36]
 
-
-fake_eval_correct <- dat_no_na[1:10,][, 5:37]
-
-fake_eval_false <- dat_no_na[11:20,][, 5:37]
-
-means_correct <- apply(fake_eval_correct, MARGIN = 2, function(x){
+means_correct <- apply(eval_correct, MARGIN = 2, function(x){
   col_num <- as.numeric(x)
   return(mean(col_num))
 })
 
-means_false <- apply(fake_eval_false, MARGIN = 2, function(x){
+means_false <- apply(eval_false, MARGIN = 2, function(x){
   col_num <- as.numeric(x)
   return(mean(col_num))
 })
 
-means_comp <- data.frame(names(means_correct), means_correct, means_false)
-colnames(means_comp) <- c("Feature", "Correct", "Incorrect")
+correct <- data.frame(Average = means_correct, group=rep("True Positive"), Feature = names(means_correct))
+false <- data.frame(Average = means_false, group=rep("False Negative"), Feature = names(means_false))
 
-ggplot(means_comp, aes(y = Feature)) + geom_bar(stat="identity", fill = "green", aes(x = Correct)) + geom_bar(stat="identity", fill= "blue", aes(x = Incorrect)) +
-  labs(title = "Average Values: Correct vs. Incorrect ")
+to_plot <- rbind(correct, false)
+to_plot$group <- factor(to_plot$group)
+
+p1 <- ggplot(to_plot, aes(y = Feature)) + geom_bar(stat="identity", aes(x = Average, fill = group), position = "dodge") + labs(title = "Average Values: True Positives")  +
+  scale_fill_manual(values = c("palegreen3", "palegreen4")) + theme_bw()
+
+eval_correct <- avnn[avnn$ControlType != "case" & class_preds_tree == 0, ][, 5:36]
+
+eval_false <- avnn[avnn$ControlType != "case" & class_preds_tree == 1, ][, 5:36]
+
+means_correct <- apply(eval_correct, MARGIN = 2, function(x){
+  col_num <- as.numeric(x)
+  return(mean(col_num))
+})
+
+means_false <- apply(eval_false, MARGIN = 2, function(x){
+  col_num <- as.numeric(x)
+  return(mean(col_num))
+})
+
+correct <- data.frame(Average = means_correct, group=rep("True Negative"), Feature = names(means_correct))
+false <- data.frame(Average = means_false, group=rep("False Positive"), Feature = names(means_false))
+
+to_plot <- rbind(correct, false)
+to_plot$group <- factor(to_plot$group)
+
+p2 <- ggplot(to_plot, aes(y = Feature)) + geom_bar(stat="identity", aes(x = Average, fill = group), position = "dodge") + labs(title = "Average Values: True Negatives/False Negatives")  +
+  scale_fill_manual(values = c("palegreen3", "palegreen4")) + theme_bw()
+
+ggarrange(p1, p2)
 ```
 
 
 
 # Summary
 By investigating primary source data for cervical spine injury (CSI) in children, we derived and validated a clinical decision rule that aims to guide imaging decisions for children who experienced blunt trauma (e.g., altered mental status, focal neurologic deficits, complaint of neck pain, torticollis). Based on our results and stability check, we believe that our decision rule will (1) provide satisfactory performance when applied to future data and (2) perform better than the baseline case in terms of both specificity and sensitivity.
+
+# Citations 
+
+[1] Leonard, J. C., Browne, L. R., Ahmad, F. A., Schwartz, H., Wallendorf, M., Leonard, J. R., Lerner, E. B., & Kuppermann, N. (2019). Cervical Spine Injury Risk Factors in Children With Blunt Trauma. Pediatrics, 144(1), e20183221. https://doi.org/10.1542/peds.2018-3221
+
+[2] Terry Therneau and Beth Atkinson (2019). rpart: Recursive Partitioning and Regression Trees. R package version 4.1-15. https://CRAN.R-project.org/package=rpart
+
