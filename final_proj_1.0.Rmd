@@ -1210,7 +1210,7 @@ set on data points the model miss-classified for both true positives and true ne
  where the "ambulatory" feature was present in the data were misclassified: both in
   the true positive and true negative case. However, the top node of the decision
   tree, FocalNeuroFindings2, is present in a high percentage of the correctly labelled positive cases,
-   while it is present in a smaller percentage of the incorreclty labelled negative cases. Ultimately, 
+   while it is present in a smaller percentage of the incorrectly labelled negative cases. Ultimately, 
    these bar plots demonstrate the trade-off between sensitivity and specificity. If we were to 
    decrease the incorrectly labelled false positives, we would increase the number of 
    false negatives.
@@ -1267,7 +1267,7 @@ ggarrange(p1, p2)
 
 
 # Summary
-By investigating primary source data for cervical spine injury (CSI) in children, we derived and validated a clinical decision rule that aims to guide imaging decisions for children who experienced blunt trauma (e.g., altered mental status, focal neurologic deficits, complaint of neck pain, torticollis). Based on our results and stability check, we believe that our decision rule will (1) provide satisfactory performance when applied to future data and (2) perform better than the baseline case in terms of both specificity and sensitivity.
+By investigating primary source data for cervical spine injury (CSI) in children, we derived and validated a clinical decision rule that aims to guide imaging decisions for children who experienced blunt trauma (e.g., altered mental status, focal neurologic deficits, complaint of neck pain, torticollis). Although we see on that the single decision tree performs the best on the test data, we chose to complete the bulk of our analysis on the logistic regression model since it performed the best on the training data. However, our stability analysis demonstrates that the model is generally stable: although we occasionally see some extreme values in sensitivity and specificity on the bootstrapped samples, the majority of the values fall within a tolerable range. These results emphasize the importance of the PCS framework in creating reliable modelling results. We chose to complete the bulk of our analysis without examining the model on the test data, so we made no decisions in the modelling process on the outcome of our test data. However, after examining the evaluation results, we would recommend further research on the single decision tree to examine if it would provide a stable, superior clinical decision rule. 
 
 # Citations 
 
