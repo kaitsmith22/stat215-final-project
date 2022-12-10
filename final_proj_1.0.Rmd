@@ -874,7 +874,18 @@ appear less frequently.
 The stability of the logistic regression classifier under bootstrapping was also 
 analyzed. The sensitivity and specificity confidence intervals of each bootstrap 
 were recorded and are plotted below.
-```{r Bootstrap-Logistic, cache=TRUE}
+```{r Bootstrap-Logistic, cache=TRUE, fig.height=3, fig.width=8, message = FALSE, warning= FALSE}
+require(gridExtra)
+
+sens_low = c()
+sens_high = c()
+sens = c()
+
+spec_low = c()
+spec_high = c()
+spec = c()
+auc_list <- c()
+
 for (j in 1:n_bootstraps){
   avn_boot <- avn[sample(nrow(avn),size=nrow(avn),replace=TRUE),]
   avnn <- avn_boot %>% drop_na(vars)
@@ -922,6 +933,8 @@ for (j in 1:n_bootstraps){
   spec = c(spec, results[2,1])
   spec_low = c(spec_low, results[2,2])
   spec_high = c(spec_high, results[2,3])
+  
+  auc_list <- c(auc_list, auc(roc(avnn$ControlType == "case", num_preds, plot=F, lty=1, lwd=2)))
 }
 
 sens_sort <- sort(sens, decreasing=T)
@@ -940,7 +953,7 @@ CI_bootstrap_sens <-round(data.frame(x = 1:n_bootstraps,
   
 # Creating scatter plot with its
 # confindence intervals
-ggplot(CI_bootstrap_sens, aes(x, sens)) + geom_point() + 
+CI_plot1 <- ggplot(CI_bootstrap_sens, aes(x, sens)) + geom_point() + 
   geom_errorbar(aes(ymin = sens_low, ymax = sens_high))+ xlab('Bootstraps (Sorted by Sensitivity Est.)') + 
   ylab('Sensitivity Estimate') + ggtitle('Sensitivity Estimates Across Bootstraps') + theme_bw()
 
@@ -951,13 +964,36 @@ CI_bootstrap_spec <-round(data.frame(x = 1:n_bootstraps,
   
 # Creating scatter plot with its
 # confindence intervals
-ggplot(CI_bootstrap_spec, aes(x, spec)) + geom_point() + 
-  geom_errorbar(aes(ymin = spec_low, ymax = spec_high)) + xlab('Sample') +
+CI_plot2 <- ggplot(CI_bootstrap_spec, aes(x, spec)) + geom_point() + 
+  geom_errorbar(aes(ymin = spec_low, ymax = spec_high)) + xlab('Bootstraps (Sorted by Specificity Est.)') +
   ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Bootstraps') + theme_bw()
 
+grid.arrange(CI_plot1, CI_plot2, ncol=2)
 ```
 The sensitivity estimates appear to be more stable than the specificity 
-estimates, as the sensitivity confidence intervals share more overlap.
+estimates, as the sensitivity confidence intervals share more overlap. 
+
+
+```{r Bootstrap-Logistic-hist, cache=TRUE, fig.height=3, fig.width=5}
+
+
+boot_auc_df <- data.frame(x = 1:n_bootstraps,
+                                     y = sort(auc_list))
+
+# ggplot(boot_auc_df, aes(x, y)) + geom_point() + 
+#   xlab('Bootstrap (Sorted by AUC)') + 
+# ylab('AUC') + ggtitle('Area under ROC Curve Across Varying Mixing Parameters') 
+
+hist(boot_auc_df$y, 
+     main="Bootstrap AUC for Logistic Regression",
+     xlab = "AUC")
+
+
+```
+To better visualize the stability across bootstraps, we plot the area under the 
+ROC curve for each logistic regression classifier generated for each bootstrap. 
+We see the AUC is roughly normally distributed and centered around an area of 
+0.8, which seems stable enough.
 
 \newpage
 # Evaluation

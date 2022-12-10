@@ -525,6 +525,16 @@ The stability of the logistic regression classifier under bootstrapping was also
 analyzed. The sensitivity and specificity confidence intervals of each bootstrap 
 were recorded and are plotted below.
 ```{r Bootstrap-Logistic}
+
+sens_low = c()
+sens_high = c()
+sens = c()
+
+spec_low = c()
+spec_high = c()
+spec = c()
+auc_list <- c()
+
 for (j in 1:n_bootstraps){
   avn_boot <- avn[sample(nrow(avn),size=nrow(avn),replace=TRUE),]
   avnn <- avn_boot %>% drop_na(vars)
@@ -572,6 +582,8 @@ for (j in 1:n_bootstraps){
   spec = c(spec, results[2,1])
   spec_low = c(spec_low, results[2,2])
   spec_high = c(spec_high, results[2,3])
+  
+  auc_list <- c(auc_list, auc(roc(avnn$ControlType == "case", num_preds, plot=F, lty=1, lwd=2)))
 }
 
 sens_sort <- sort(sens, decreasing=T)
@@ -581,6 +593,7 @@ sens_high_sort <- sens_high[order(sens, decreasing=T)]
 spec_sort <- sort(spec, decreasing=T)
 spec_low_sort <- spec_low[order(spec, decreasing=T)]
 spec_high_sort <- spec_high[order(spec, decreasing=T)]
+
 
 
 CI_bootstrap_sens <-round(data.frame(x = 1:n_bootstraps,
@@ -601,9 +614,20 @@ CI_bootstrap_spec <-round(data.frame(x = 1:n_bootstraps,
   
 # Creating scatter plot with its
 # confindence intervals
-ggplot(CI_bootstrap_spec, aes(x, spec)) + geom_point() + 
-geom_errorbar(aes(ymin = spec_low, ymax = spec_high)) + xlab('Bootstraps (Sorted by Specificity Est.)') +
-ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Bootstraps')
+# ggplot(CI_bootstrap_spec, aes(x, spec)) + geom_point() + 
+# geom_errorbar(aes(ymin = spec_low, ymax = spec_high)) + xlab('Bootstraps (Sorted by Specificity Est.)') +
+# ylab('Specificity Estimate') + ggtitle('Specificity Estimates Across Bootstraps')
+
+boot_auc_df <- data.frame(x = 1:n_bootstraps,
+                                     y = sort(auc_list))
+
+# ggplot(boot_auc_df, aes(x, y)) + geom_point() + 
+#   xlab('Bootstrap (Sorted by AUC)') + 
+# ylab('AUC') + ggtitle('Area under ROC Curve Across Varying Mixing Parameters') 
+
+hist(boot_auc_df$y, 
+     main="AUC for Logistic Regression on Bootstrapped Data",
+     xlab = "AUC")
 
 ```
 The sensitivity estimates appear to be more stable than the specificity 
